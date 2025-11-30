@@ -679,12 +679,28 @@ health_check() {
   fi
 }
 
+play_menu_cast() {
+  if ! command -v asciinema >/dev/null 2>&1; then
+    echo "asciinema is not installed or not in PATH."
+    echo "See README.md for installation instructions."
+    return 1
+  fi
+
+  if [ ! -f "$SCRIPT_DIR/1ness-menu.cast" ]; then
+    echo "Cast file not found: $SCRIPT_DIR/1ness-menu.cast"
+    return 1
+  fi
+
+  asciinema play "$SCRIPT_DIR/1ness-menu.cast"
+}
+
 menu() {
   while true; do
     clear
     print_info
     echo
     echo -e "${green}Menu:${reset}"
+    echo "  00) Play menu demo (asciinema)"
     echo "  1) Build images (all / individual)"
     echo "  2) Start Ness Essential stack"
     echo "  3) Test / Status menu"
@@ -698,6 +714,7 @@ menu() {
     echo
     read -rp "Select an option: " choice
     case "$choice" in
+      00) play_menu_cast ;;
       1) build_images_menu ;;
       2) start_services_menu ;;
       3) test_menu ;;

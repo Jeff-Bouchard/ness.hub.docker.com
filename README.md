@@ -6,6 +6,42 @@ Docker images for Umbrel app store integration.
 
 <a href="https://asciinema.org/a/QqGDvbbTYotxKn6ZKcSndUP7V" target="_blank"><img src="https://asciinema.org/a/QqGDvbbTYotxKn6ZKcSndUP7V.svg" /></a>
 
+### Terminal demo (asciinema)
+
+To record or update short terminal walkthroughs, this repository currently uses [asciinema](https://asciinema.org/).
+
+#### Install asciinema (Python/pip example)
+
+```bash
+pip install --user asciinema
+```
+
+For other installation options and platforms, please refer to the upstream asciinema documentation.
+
+#### Record or update the `1ness-menu.cast` demo
+
+From the project root:
+
+```bash
+asciinema rec 1ness-menu.cast
+```
+
+Run through the menu or workflow you want to capture, then exit the recording as prompted.
+
+#### Upload and embed
+
+```bash
+asciinema upload 1ness-menu.cast
+```
+
+The upload command returns a URL such as `https://asciinema.org/a/<CAST_ID>`. To embed that cast in Markdown (as used at the top of this file), you can add:
+
+```markdown
+[![asciicast](https://asciinema.org/a/<CAST_ID>.svg)](https://asciinema.org/a/<CAST_ID>)
+```
+
+Replace `<CAST_ID>` with the identifier from your uploaded recording.
+
 ## Security behaviour (experimental)
 
 This stack includes an experimental configuration where some cryptographic operations **block** if the system believes entropy may be insufficient. The intent is to favour perceived cryptographic safety over availability on hosts that opt into this profile.

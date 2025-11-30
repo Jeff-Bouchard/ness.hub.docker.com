@@ -1,0 +1,944 @@
+<!DOCTYPE html>
+<html lang="en" data-ness-theme="dark">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="color-scheme" content="dark" />
+  <title>NESS Menu V4</title>
+  <style>
+    :root {
+      --bg-primary: #020409;
+      --bg-panel: #080b13;
+      --bg-panel-alt: #0d111a;
+      --bg-chip: rgba(255, 255, 255, 0.05);
+      --border-color: #232838;
+      --text-main: #f5f8ff;
+      --text-muted: #9aa5c5;
+      --accent: #f78f1e;
+      --accent-2: #4fc1ff;
+      --accent-3: #ce60ff;
+      --danger: #ff5470;
+      --success: #5ce0a0;
+      --shadow: 0 18px 40px rgba(0, 0, 0, 0.45);
+      font-family: "IBM Plex Sans", "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif;
+      line-height: 1.5;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: radial-gradient(circle at top, #101326, var(--bg-primary));
+      color: var(--text-main);
+      padding: 28px clamp(18px, 4vw, 60px) 48px;
+    }
+
+    h1, h2, h3, h4 {
+      margin: 0;
+      font-weight: 600;
+    }
+
+    a {
+      color: var(--accent-2);
+    }
+
+    .app-shell {
+      max-width: 1200px;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+    }
+
+    .hero {
+      background: linear-gradient(130deg, rgba(11, 14, 25, 0.9), rgba(5, 7, 14, 0.8));
+      border: 1px solid var(--border-color);
+      border-radius: 18px;
+      padding: 28px;
+      box-shadow: var(--shadow);
+    }
+
+    .hero__top {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 18px;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .logo-ascii {
+      font-family: "JetBrains Mono", "Fira Code", Consolas, monospace;
+      font-size: 0.9rem;
+      letter-spacing: 0.04em;
+      white-space: pre;
+      color: var(--accent-2);
+      margin: 0;
+    }
+
+    .badges {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+
+    .badge {
+      border-radius: 999px;
+      padding: 6px 16px;
+      font-size: 0.88rem;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: var(--bg-chip);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .badge strong {
+      font-size: 0.95rem;
+      letter-spacing: 0.02em;
+    }
+
+    .badge--interactive {
+      cursor: pointer;
+      position: relative;
+    }
+
+    .badge-caret {
+      font-size: 0.7rem;
+      opacity: 0.75;
+    }
+
+    .reality-dropdown {
+      position: absolute;
+      top: 120%;
+      left: 0;
+      z-index: 20;
+      min-width: 260px;
+      padding: 10px;
+      background: var(--bg-panel);
+      border-radius: 14px;
+      border: 1px solid var(--border-color);
+      box-shadow: var(--shadow);
+      display: none;
+      gap: 8px;
+      flex-direction: column;
+    }
+
+    .reality-dropdown.open {
+      display: flex;
+    }
+
+    .reality-dropdown button {
+      width: 100%;
+      justify-content: flex-start;
+      background: transparent;
+      color: var(--text-main);
+      box-shadow: none;
+      border-radius: 999px;
+      border: 1px solid transparent;
+      padding: 8px 12px;
+      font-weight: 500;
+    }
+
+    .reality-dropdown button:hover:not(:disabled) {
+      transform: none;
+      box-shadow: none;
+      background: var(--bg-chip);
+    }
+
+    .reality-dropdown button.active {
+      border-color: var(--accent-2);
+      background: rgba(79, 193, 255, 0.16);
+      color: var(--accent-2);
+    }
+
+    .control-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 18px;
+      margin-top: 24px;
+    }
+
+    .card {
+      background: var(--bg-panel);
+      border: 1px solid var(--border-color);
+      border-radius: 18px;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .card h3 {
+      font-size: 1.05rem;
+      color: var(--accent-2);
+    }
+
+    .card small {
+      color: var(--text-muted);
+      font-size: 0.85rem;
+    }
+
+    label span {
+      display: block;
+      font-size: 0.78rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--text-muted);
+      margin-bottom: 6px;
+    }
+
+    input[type="text"],
+    input[type="url"],
+    select,
+    textarea {
+      width: 100%;
+      border-radius: 12px;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      background: var(--bg-panel-alt);
+      color: var(--text-main);
+      padding: 10px 14px;
+      font-size: 1rem;
+      font-family: inherit;
+    }
+
+    button {
+      border: none;
+      cursor: pointer;
+      font-weight: 600;
+      font-size: 0.95rem;
+      border-radius: 12px;
+      padding: 11px 18px;
+      color: #04050a;
+      background: linear-gradient(135deg, var(--accent), #ffbf5a);
+      transition: transform 120ms ease, box-shadow 120ms ease;
+    }
+
+    button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    button:hover:not(:disabled) {
+      transform: translateY(-1px);
+      box-shadow: 0 8px 16px rgba(247, 143, 30, 0.35);
+    }
+
+    .button-secondary {
+      background: linear-gradient(135deg, var(--accent-2), #7fe1ff);
+      color: #010409;
+    }
+
+    .button-danger {
+      background: linear-gradient(135deg, var(--danger), #ff7f97);
+      color: #02030b;
+    }
+
+    .pill-group {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    .pill-group button {
+      flex: 1 1 140px;
+      border-radius: 999px;
+      background: var(--bg-chip);
+      color: var(--text-main);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      text-align: center;
+      padding: 10px 14px;
+    }
+
+    .pill-group button.active {
+      background: var(--accent-3);
+      color: #04050a;
+      box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.12);
+    }
+
+    .profile-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 14px;
+    }
+
+    .profile-card {
+      border-radius: 18px;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      padding: 18px;
+      background: var(--bg-panel-alt);
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      transition: border 120ms ease, transform 120ms ease;
+    }
+
+    .profile-card.active {
+      border-color: var(--accent-2);
+      box-shadow: 0 8px 18px rgba(79, 193, 255, 0.25);
+      transform: translateY(-1px);
+    }
+
+    .profile-card h4 {
+      font-size: 1.02rem;
+      margin: 0;
+    }
+
+    .profile-card p {
+      margin: 0;
+      color: var(--text-muted);
+      font-size: 0.88rem;
+    }
+
+    .actions-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 16px;
+    }
+
+    .action-card {
+      background: var(--bg-panel);
+      border: 1px solid var(--border-color);
+      border-radius: 18px;
+      padding: 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .action-card h4 {
+      margin: 0;
+      font-size: 1rem;
+      color: var(--accent);
+    }
+
+    .action-card p {
+      margin: 0;
+      color: var(--text-muted);
+      font-size: 0.9rem;
+    }
+
+    .action-card footer {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .fleet-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.85rem;
+      margin-top: 4px;
+    }
+
+    .fleet-table th,
+    .fleet-table td {
+      padding: 6px 8px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+      text-align: left;
+    }
+
+    .fleet-table th {
+      color: var(--text-muted);
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      font-size: 0.76rem;
+    }
+
+    .stack {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    form.dns-form {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 16px;
+    }
+
+    form.dns-form button[type="submit"] {
+      grid-column: 1 / -1;
+      justify-self: flex-start;
+    }
+
+    #actionLog {
+      background: #010308;
+      border-radius: 12px;
+      border: 1px solid var(--border-color);
+      padding: 16px;
+      min-height: 220px;
+      font-family: "JetBrains Mono", "Fira Code", Consolas, monospace;
+      font-size: 0.9rem;
+      color: #96ffa4;
+      overflow-x: auto;
+      white-space: pre-wrap;
+      flex: 1;
+    }
+
+    .log-info { color: #8bd8ff; }
+    .log-error { color: #ff9bb5; }
+    .log-success { color: #9af7c1; }
+
+    .api-row {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+
+    .api-row input {
+      flex: 1 1 240px;
+    }
+
+    @media (max-width: 640px) {
+      .hero__top {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+      .badge {
+        width: 100%;
+        justify-content: space-between;
+      }
+      .pill-group button {
+        flex: 1 1 100%;
+      }
+    }
+
+    @media (min-width: 1100px) {
+      .app-shell {
+        max-width: 1400px;
+        display: grid;
+        grid-template-columns: minmax(0, 1.4fr) minmax(0, 1.8fr) minmax(0, 1.4fr);
+        grid-template-rows: auto minmax(0, 1fr);
+        grid-template-areas:
+          "hero hero hero"
+          "labels operations log";
+        gap: 24px;
+        align-items: flex-start;
+      }
+
+      .hero {
+        grid-area: hero;
+      }
+
+      #labelsSection {
+        grid-area: labels;
+      }
+
+      #operationsSection {
+        grid-area: operations;
+      }
+
+      #logSection {
+        grid-area: log;
+        position: sticky;
+        top: 24px;
+        align-self: flex-start;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="app-shell">
+    <section class="hero">
+      <div class="hero__top">
+        <pre class="logo-ascii"> _   _                     _   _                   _   _            
+| \ | |                   | \ | |                 | \ | |           
+|  \| | ___  ___ ___ _ __ |  \| | ___  _ __ ___   |  \| | _____   __
+| . ` |/ _ \/ __/ _ \ '_ \| . ` |/ _ \| '_ ` _ \  | . ` |/ _ \ \ / /
+| |\  |  __/ (_|  __/ | | | |\  | (_) | | | | | | | |\  |  __/\ V / 
+\_| \_/\___|\___\___|_| |_|_| \_/\___/|_| |_| |_| \_| \_/\___| \_/  </pre>
+        <div class="badges">
+          <div class="badge badge--interactive" id="realityBadge">
+            <strong>Reality</strong>
+            <span data-role="reality-text">Hybrid → EmerDNS first</span>
+            <span class="badge-caret">↓</span>
+            <div class="reality-dropdown" id="realityDropdown">
+              <button type="button" data-mode="icann">ICANN-only</button>
+              <button type="button" data-mode="hybrid">Hybrid</button>
+              <button type="button" data-mode="emerdns">EmerDNS-only</button>
+            </div>
+          </div>
+          <div class="badge" id="profileBadge"><strong>Profile</strong><span data-role="profile-text">Pi 3 Essentials</span></div>
+          <div class="badge"><strong>Stack</strong><span>AuxPoW core → MCP suites → overlays</span></div>
+        </div>
+      </div>
+
+      <div class="control-grid" style="margin-top: 26px;">
+        <div class="card stack">
+          <h3>API Endpoint</h3>
+          <small>Point this UI at the Ness automation endpoint that proxies CLI actions.</small>
+          <div class="api-row">
+            <input type="url" id="apiBase" placeholder="https://node.example.org/api/menu" />
+            <button type="button" class="button-secondary" id="saveEndpoint">Set</button>
+          </div>
+          <small id="endpointStatus" class="log-info">No endpoint configured. Actions will stay local.</small>
+          <div class="stack" style="margin-top: 16px;">
+            <label>
+              <span>Deployment profile</span>
+              <select id="profileSelect"></select>
+            </label>
+            <small>Pick the hardware/service bundle that Start Stack will control.</small>
+            <label>
+              <span>Container engine</span>
+              <select id="engineSelect">
+                <option value="docker">Docker</option>
+                <option value="podman">Podman</option>
+              </select>
+            </label>
+            <small>Use Docker or Podman to run this stack.</small>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="card stack" id="labelsSection">
+      <h3>Reality Labels</h3>
+      <small>Personalize each mode to match your published narratives. Persisted via localStorage and shared with MCP clients embedding this UI.</small>
+      <form class="dns-form" id="dnsForm">
+        <label>
+          <span>ICANN-only</span>
+          <input type="text" name="icann" required />
+        </label>
+        <label>
+          <span>Hybrid</span>
+          <input type="text" name="hybrid" required />
+        </label>
+        <label>
+          <span>EmerDNS-only</span>
+          <input type="text" name="emerdns" required />
+        </label>
+        <button type="submit">Save labels</button>
+      </form>
+    </section>
+
+    <section class="card stack" id="operationsSection">
+      <h3>Operations Console</h3>
+      <small>HTML port of Menu V4 actions. Buttons send intents to your automation endpoint together with current profile + reality context.</small>
+      <div class="actions-grid">
+        <article class="action-card">
+          <h4>Build images</h4>
+          <p>Kick off Docker build pipelines with full multi-arch visibility.</p>
+          <footer>
+            <button type="button" class="button-secondary" data-action="build-all" data-payload='{"script":"build-all.sh"}'>build-all.sh</button>
+            <button type="button" class="button-secondary" data-action="build-multiarch" data-payload='{"script":"build-multiarch.sh"}'>build-multiarch.sh</button>
+          </footer>
+          <div class="stack" style="margin-top: 10px;">
+            <small>Single image (mirrors CLI per-image build):</small>
+            <div class="api-row">
+              <select id="singleImageSelect">
+                <option value="">Select image…</option>
+              </select>
+              <button type="button" class="button-secondary" id="buildSingleImageBtn">Build selected</button>
+            </div>
+          </div>
+        </article>
+        <article class="action-card">
+          <h4>Start stack</h4>
+          <p>Start only the services that belong to the selected profile.</p>
+          <footer>
+            <button type="button" data-action="start-stack">Start</button>
+            <button type="button" class="button-secondary" data-action="stop-stack">Stop</button>
+          </footer>
+        </article>
+        <article class="action-card">
+          <h4>Stack status</h4>
+          <p>Inspect docker compose state the same way the CLI option 4 does.</p>
+          <footer>
+            <button type="button" data-action="stack-status">Show status</button>
+          </footer>
+        </article>
+        <article class="action-card">
+          <h4>Tail logs</h4>
+          <p>Stream logs across all services; best piped into MCP log analyzers.</p>
+          <footer>
+            <button type="button" data-action="tail-logs">Tail logs</button>
+          </footer>
+        </article>
+        <article class="action-card">
+          <h4>Entropy audit</h4>
+          <p>Verify that UHE generators (RC4OK + UHEPRNG) are online.</p>
+          <footer>
+            <button type="button" data-action="check-entropy">Check entropy</button>
+          </footer>
+        </article>
+        <article class="action-card">
+          <h4>Tests &amp; E2E</h4>
+          <p>Run the same health and overlay checks as Menu V4 (RPC, explorers, overlays/VPN).</p>
+          <footer>
+            <button type="button" class="button-secondary" data-action="health-check">Core node health</button>
+            <button type="button" class="button-secondary" data-action="test-full-node-overlays">Full node overlays/VPN</button>
+            <button type="button" data-action="test-full-node-e2e">Full node E2E</button>
+          </footer>
+          <footer>
+            <button type="button" data-action="test-dns-reverse-proxy">DNS reverse proxy</button>
+            <button type="button" data-action="test-pyuheprng">pyuheprng</button>
+            <button type="button" data-action="test-skywire">Skywire visor</button>
+          </footer>
+        </article>
+        <article class="action-card">
+          <h4>Remove local state</h4>
+          <p>Stop containers, remove volumes, prune caches. Use with caution.</p>
+          <footer>
+            <button type="button" class="button-danger" data-action="nuke-local">Remove everything</button>
+          </footer>
+        </article>
+        <article class="action-card">
+          <h4>Fleet rewards (coming soon)</h4>
+          <p>Per-node Skywire identity and rewards accounting from Privateness + Skywire controllers.</p>
+          <table class="fleet-table">
+            <thead>
+              <tr>
+                <th>Node</th>
+                <th>Skywire pubkey</th>
+                <th>Last seen</th>
+                <th>Skywire rewards paid</th>
+                <th>Privateness rewards paid</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td colspan="5">Coming soon – wired in Menu V4 to the controller and rewards indexer.</td>
+              </tr>
+            </tbody>
+          </table>
+        </article>
+        <article class="action-card">
+          <h4>Reality labels</h4>
+          <p>Sync label changes downstream (mirrors CLI option 8).</p>
+          <footer>
+            <button type="button" data-action="sync-labels">Sync labels</button>
+          </footer>
+        </article>
+        <article class="action-card">
+          <h4>Exit session</h4>
+          <p>Signal remote agents that this operator UI is closing.</p>
+          <footer>
+            <button type="button" data-action="exit">Exit</button>
+          </footer>
+        </article>
+      </div>
+    </section>
+
+    <section class="card stack" id="logSection">
+      <h3>Action Log</h3>
+      <small>Responses from the automation endpoint land here. Useful for MCP agents parsing JSON.</small>
+      <pre id="actionLog">Ready. Configure an endpoint or operate locally.</pre>
+    </section>
+  </main>
+
+  <script>
+    const STORAGE_KEYS = {
+      dnsLabels: "ness.dnsLabels",
+      dnsMode: "ness.dnsMode",
+      profile: "ness.profile",
+      endpoint: "ness.apiEndpoint",
+      engine: "ness.engine"
+    };
+
+    const DEFAULT_LABELS = {
+      icann: "ICANN-only (deny EmerDNS)",
+      hybrid: "Hybrid (EmerDNS first, ICANN fallback)",
+      emerdns: "EmerDNS-only (deny ICANN)"
+    };
+
+    const PROFILES = {
+      pi3: {
+        title: "Pi 3 Essentials",
+        desc: "Emercoin, Privateness, DNS, Skywire, Tools",
+      },
+      skyminer: {
+        title: "Skyminer",
+        desc: "Emercoin, Privateness, DNS, Tools — no Skywire container",
+      },
+      full: {
+        title: "Full Node (overlays + DNS + tools)",
+        desc: "Emercoin core, overlays (Yggdrasil, I2P-Yggdrasil, Skywire, AmneziaWG, Skywire-AmneziaWG), DNS, pyuheprng, Privateness, Privatenesstools",
+      },
+      "mcp-server": {
+        title: "MCP Server Suite (remote control)",
+        desc: "Emercoin/Privateness MCP daemons, Magic Wormhole rendezvous/transit",
+      },
+      "mcp-client": {
+        title: "MCP Client Suite (apps & helpers)",
+        desc: "MCP apps, QR helpers, Magic Wormhole client",
+      }
+    };
+
+    const SINGLE_IMAGES = [
+      "emercoin-core",
+      "yggdrasil",
+      "dns-reverse-proxy",
+      "skywire",
+      "privateness",
+      "ness-blockchain",
+      "pyuheprng",
+      "privatenesstools",
+      "pyuheprng-privatenesstools",
+      "ipfs",
+      "i2p-yggdrasil",
+      "amneziawg",
+      "skywire-amneziawg",
+      "amnezia-exit",
+      "ness-unified",
+    ];
+
+    const state = {
+      dnsMode: localStorage.getItem(STORAGE_KEYS.dnsMode) || "hybrid",
+      dnsLabels: JSON.parse(localStorage.getItem(STORAGE_KEYS.dnsLabels) || "null") || { ...DEFAULT_LABELS },
+      profile: localStorage.getItem(STORAGE_KEYS.profile) || "pi3",
+      endpoint: localStorage.getItem(STORAGE_KEYS.endpoint) || "",
+      engine: localStorage.getItem(STORAGE_KEYS.engine) || "docker"
+    };
+
+    const refs = {
+      realityBadge: document.getElementById("realityBadge"),
+      realityDropdown: document.getElementById("realityDropdown"),
+      dnsForm: document.getElementById("dnsForm"),
+      profileSelect: document.getElementById("profileSelect"),
+      engineSelect: document.getElementById("engineSelect"),
+      realityText: document.querySelector('[data-role="reality-text"]'),
+      profileText: document.querySelector('[data-role="profile-text"]'),
+      actionLog: document.getElementById("actionLog"),
+      apiBase: document.getElementById("apiBase"),
+      endpointStatus: document.getElementById("endpointStatus"),
+      saveEndpoint: document.getElementById("saveEndpoint"),
+      singleImageSelect: document.getElementById("singleImageSelect"),
+      buildSingleImageBtn: document.getElementById("buildSingleImageBtn"),
+    };
+
+    refs.apiBase.value = state.endpoint;
+    updateEndpointStatus();
+
+    function persist() {
+      localStorage.setItem(STORAGE_KEYS.dnsMode, state.dnsMode);
+      localStorage.setItem(STORAGE_KEYS.profile, state.profile);
+      localStorage.setItem(STORAGE_KEYS.dnsLabels, JSON.stringify(state.dnsLabels));
+      localStorage.setItem(STORAGE_KEYS.endpoint, state.endpoint);
+      localStorage.setItem(STORAGE_KEYS.engine, state.engine);
+    }
+
+    function renderRealityButtons() {
+      const buttons = refs.realityDropdown.querySelectorAll("button[data-mode]");
+      buttons.forEach(btn => {
+        const mode = btn.dataset.mode;
+        btn.textContent = state.dnsLabels[mode];
+        btn.classList.toggle("active", mode === state.dnsMode);
+      });
+      refs.realityText.textContent = `${state.dnsLabels[state.dnsMode]}`;
+    }
+
+    function renderProfileSelect() {
+      if (!refs.profileSelect) return;
+      refs.profileSelect.innerHTML = "";
+      Object.entries(PROFILES).forEach(([key, meta]) => {
+        const opt = document.createElement("option");
+        opt.value = key;
+        opt.textContent = meta.title;
+        if (state.profile === key) opt.selected = true;
+        refs.profileSelect.appendChild(opt);
+      });
+      refs.profileText.textContent = PROFILES[state.profile]?.title || state.profile;
+    }
+
+    function renderEngineSelect() {
+      if (!refs.engineSelect) return;
+      const value = state.engine || "docker";
+      refs.engineSelect.value = value;
+    }
+
+    function populateDnsForm() {
+      refs.dnsForm.icann.value = state.dnsLabels.icann;
+      refs.dnsForm.hybrid.value = state.dnsLabels.hybrid;
+      refs.dnsForm.emerdns.value = state.dnsLabels.emerdns;
+    }
+
+    function populateSingleImageSelect() {
+      if (!refs.singleImageSelect) return;
+      refs.singleImageSelect.querySelectorAll("option:not(:first-child)").forEach(opt => opt.remove());
+      SINGLE_IMAGES.forEach(name => {
+        const opt = document.createElement("option");
+        opt.value = name;
+        opt.textContent = name;
+        refs.singleImageSelect.appendChild(opt);
+      });
+    }
+
+    if (refs.engineSelect) {
+      refs.engineSelect.addEventListener("change", () => {
+        const value = refs.engineSelect.value || "docker";
+        state.engine = value;
+        persist();
+        log(`Container engine set to ${value}`, "info");
+      });
+    }
+
+    if (refs.profileSelect) {
+      refs.profileSelect.addEventListener("change", () => {
+        const value = refs.profileSelect.value;
+        if (!PROFILES[value]) return;
+        state.profile = value;
+        persist();
+        renderProfileSelect();
+        const title = PROFILES[state.profile]?.title || state.profile;
+        log(`Profile set to ${title}`, "success");
+      });
+    }
+
+    if (refs.realityDropdown) {
+      refs.realityDropdown.addEventListener("click", (event) => {
+        const btn = event.target.closest("button[data-mode]");
+        if (!btn) return;
+        state.dnsMode = btn.dataset.mode;
+        persist();
+        renderRealityButtons();
+        log(`Reality mode switched to ${state.dnsLabels[state.dnsMode]} (requesting system DNS change + cache flush)`, "info");
+        refs.realityDropdown.classList.remove("open");
+        callMenuAction("set-dns-mode", { dns_mode: state.dnsMode });
+      });
+    }
+
+    if (refs.realityBadge && refs.realityDropdown) {
+      refs.realityBadge.addEventListener("click", (event) => {
+        event.stopPropagation();
+        refs.realityDropdown.classList.toggle("open");
+      });
+
+      document.addEventListener("click", (event) => {
+        if (!refs.realityDropdown.contains(event.target) && event.target !== refs.realityBadge) {
+          refs.realityDropdown.classList.remove("open");
+        }
+      });
+    }
+
+    refs.dnsForm.addEventListener("submit", (event) => {
+      event.preventDefault();
+      state.dnsLabels = {
+        icann: refs.dnsForm.icann.value.trim(),
+        hybrid: refs.dnsForm.hybrid.value.trim(),
+        emerdns: refs.dnsForm.emerdns.value.trim()
+      };
+      persist();
+      renderRealityButtons();
+      log("Reality labels updated.", "success");
+    });
+
+    refs.saveEndpoint.addEventListener("click", () => {
+      state.endpoint = refs.apiBase.value.trim();
+      persist();
+      updateEndpointStatus();
+      log(state.endpoint ? `Endpoint set to ${state.endpoint}` : "Endpoint cleared. Actions stay local.", "info");
+    });
+
+    if (refs.buildSingleImageBtn) {
+      refs.buildSingleImageBtn.addEventListener("click", () => {
+        const image = refs.singleImageSelect?.value || "";
+        if (!image) {
+          log("Select an image to build first.", "error");
+          return;
+        }
+        callMenuAction("build-image", { image });
+      });
+    }
+
+    function updateEndpointStatus() {
+      if (state.endpoint) {
+        const lower = state.endpoint.toLowerCase();
+        if (lower.includes("graphql")) {
+          refs.endpointStatus.textContent = `Endpoint looks like a GraphQL API. This dashboard expects a Ness automation endpoint for ness-menu-v4.sh actions, not a raw GraphQL URL.`;
+          refs.endpointStatus.className = "log-error";
+        } else {
+          refs.endpointStatus.textContent = `Sending POST payloads to ${state.endpoint}`;
+          refs.endpointStatus.className = "log-success";
+        }
+      } else {
+        refs.endpointStatus.textContent = "No endpoint configured. Actions will remain local (simulation mode).";
+        refs.endpointStatus.className = "log-info";
+      }
+    }
+
+    function log(message, level = "info") {
+      const timestamp = new Date().toISOString();
+      const line = `[${timestamp}] ${message}`;
+      const span = document.createElement("span");
+      span.textContent = `${line}\n`;
+      span.className = `log-${level}`;
+      refs.actionLog.appendChild(span);
+      refs.actionLog.scrollTop = refs.actionLog.scrollHeight;
+    }
+
+    async function callMenuAction(action, payload = {}) {
+      const body = {
+        action,
+        profile: state.profile,
+        dns_mode: state.dnsMode,
+        engine: state.engine,
+        labels: state.dnsLabels,
+        ...payload
+      };
+
+      log(`Dispatching action ${action} with payload ${JSON.stringify(payload)}`, "info");
+
+      if (!state.endpoint) {
+        log("Endpoint missing: configure API endpoint to forward action.", "error");
+        return;
+      }
+
+      try {
+        const response = await fetch(state.endpoint, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify(body)
+        });
+
+        const text = await response.text();
+        let parsed;
+        try {
+          parsed = JSON.parse(text);
+        } catch (err) {
+          parsed = text;
+        }
+
+        if (!response.ok) {
+          throw new Error(typeof parsed === "string" ? parsed : JSON.stringify(parsed));
+        }
+
+        log(typeof parsed === "string" ? parsed : JSON.stringify(parsed, null, 2), "success");
+      } catch (error) {
+        let msg = error && error.message ? String(error.message) : String(error);
+        if (msg.includes("Must provide query string")) {
+          msg = "Endpoint responded with 'Must provide query string'. It likely expects a GraphQL 'query' field, while this dashboard sends JSON menu actions. Please point the API Endpoint at your Ness automation endpoint instead of a GraphQL URL.";
+        }
+        log(`Error: ${msg}`, "error");
+      }
+    }
+
+    document.querySelectorAll("[data-action]").forEach((button) => {
+      button.addEventListener("click", () => {
+        let payload = {};
+        const raw = button.dataset.payload;
+        if (raw) {
+          try {
+            payload = JSON.parse(raw);
+          } catch (err) {
+            log(`Invalid payload JSON: ${err.message}`, "error");
+          }
+        }
+        callMenuAction(button.dataset.action, payload);
+      });
+    });
+
+    renderRealityButtons();
+    renderProfileSelect();
+    renderEngineSelect();
+    populateDnsForm();
+    populateSingleImageSelect();
+  </script>
+</body>
+</html>
