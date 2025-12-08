@@ -1,9 +1,0 @@
-#!/usr/bin/env bash
-
-# Wrapper to run AmneziaWG's `awg` tool inside the amneziawg container.
-# Examples:
-#   ./amneziawg-cli show awg0
-#   ./amneziawg-cli showconf awg0
-#   ./amneziawg-cli help
-
-MSYS_NO_PATHCONV=1 docker exec -it amneziawg awg "$@"
