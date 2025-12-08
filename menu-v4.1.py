@@ -16,19 +16,75 @@ MENU_SCRIPT = os.path.join(SCRIPT_DIR, "menuv4.sh")
 BASH = os.environ.get("BASH", "bash")
 MENU_CMD_BASE = [BASH, MENU_SCRIPT]
 
+API_KEY_ENV_VAR = "NESS_MENU_API_KEY"  # legacy shared secret
+API_KEY_HEADER = "X-API-Key"  # legacy header, still accepted
+
+EMERSSH_ENV_VAR = "NESS_MENU_EMERSSH_PUBKEY"  # OpenSSH-style public key string
+EMERSSH_HEADER = "X-EmerSSH-Key"
+
+SSL_SERIAL_ENV_VAR = "NESS_MENU_SSL_SERIAL"  # e.g. client certificate serial
+SSL_SERIAL_HEADER = "X-SSL-Serial"
+
+ALLOWED_ORIGINS_ENV_VAR = "NESS_MENU_ALLOWED_ORIGINS"
+ALLOWED_ORIGINS = [
+    origin.strip()
+    for origin in os.environ.get(ALLOWED_ORIGINS_ENV_VAR, "").split(",")
+    if origin.strip()
+]
+
+REQUIRED_EMERSSH_KEY = os.environ.get(EMERSSH_ENV_VAR, "")
+REQUIRED_SSL_SERIAL = os.environ.get(SSL_SERIAL_ENV_VAR, "")
+LEGACY_API_KEY = os.environ.get(API_KEY_ENV_VAR, "")
+
 
 class MenuHandler(BaseHTTPRequestHandler):
+    def _is_origin_allowed(self, origin):
+        if not origin:
+            return False
+        if ALLOWED_ORIGINS:
+            return origin in ALLOWED_ORIGINS
+        return False
+
+    def _is_authenticated(self):
+        # Prefer explicit EmerSSH public key if configured
+        if REQUIRED_EMERSSH_KEY:
+            provided = self.headers.get(EMERSSH_HEADER, "")
+            return provided == REQUIRED_EMERSSH_KEY
+
+        # Fallback: SSL serial number if configured
+        if REQUIRED_SSL_SERIAL:
+            provided = self.headers.get(SSL_SERIAL_HEADER, "")
+            return provided == REQUIRED_SSL_SERIAL
+
+        # Legacy mode: simple shared API key
+        if LEGACY_API_KEY:
+            provided = self.headers.get(API_KEY_HEADER, "")
+            return provided == LEGACY_API_KEY
+
+        # No credentials configured -> remain locked down (401)
+        return False
+
     def _set_headers(self, status=200, content_type="application/json"):
         self.send_response(status)
         self.send_header("Content-Type", content_type)
-        self.send_header("Access-Control-Allow-Origin", "*")
+        origin = self.headers.get("Origin")
+        if origin and self._is_origin_allowed(origin):
+            self.send_header("Access-Control-Allow-Origin", origin)
         self.end_headers()
 
     def do_OPTIONS(self):
+        origin = self.headers.get("Origin")
+        if not origin or not self._is_origin_allowed(origin):
+            self.send_response(403)
+            self.end_headers()
+            return
         self.send_response(200)
-        self.send_header("Access-Control-Allow-Origin", "*")
+        self.send_header("Access-Control-Allow-Origin", origin)
         self.send_header("Access-Control-Allow-Methods", "POST, OPTIONS")
-        self.send_header("Access-Control-Allow-Headers", "Content-Type")
+        self.send_header(
+            "Access-Control-Allow-Headers",
+            "Content-Type, X-API-Key, X-EmerSSH-Key, X-SSL-Serial",
+        )
         self.end_headers()
 
     def do_GET(self):
@@ -41,7 +97,9 @@ class MenuHandler(BaseHTTPRequestHandler):
         if parsed.path == "/favicon.ico":
             # No content, just silence the browser's favicon requests
             self.send_response(204)
-            self.send_header("Access-Control-Allow-Origin", "*")
+            origin = self.headers.get("Origin")
+            if origin and self._is_origin_allowed(origin):
+                self.send_header("Access-Control-Allow-Origin", origin)
             self.end_headers()
             return
 
@@ -60,6 +118,17 @@ class MenuHandler(BaseHTTPRequestHandler):
             self.wfile.write(b"{\"error\":\"Not found\"}")
             return
 
+        origin = self.headers.get("Origin")
+        if origin and not self._is_origin_allowed(origin):
+            self._set_headers(403)
+            self.wfile.write(b"{\"error\":\"Origin not allowed\"}")
+            return
+
+        if not self._is_authenticated():
+            self._set_headers(401)
+            self.wfile.write(b"{\"error\":\"Missing or invalid API key\"}")
+            return
+
         length = int(self.headers.get("Content-Length", "0") or "0")
         raw_body = self.rfile.read(length) if length else b"{}"
 
@@ -75,6 +144,15 @@ class MenuHandler(BaseHTTPRequestHandler):
         profile = data.get("profile") or ""
         dns_mode = data.get("dns_mode") or ""
         engine = (data.get("engine") or "").strip()
+
+        identity = data.get("identity") or {}
+        emer_id_name = (identity.get("id_name") or identity.get("nvs_name") or "").strip()
+        emer_id_scheme = (identity.get("scheme") or "").strip()
+
+        if not emer_id_name:
+            emer_id_name = (self.headers.get("X-Emer-ID-Name") or "").strip()
+        if not emer_id_scheme:
+            emer_id_scheme = (self.headers.get("X-Emer-ID-Scheme") or "").strip()
         image = (data.get("image") or
                  (data.get("payload") or {}).get("image"))  # very small convenience
 
@@ -101,6 +179,20 @@ class MenuHandler(BaseHTTPRequestHandler):
         env = os.environ.copy()
         if engine:
             env["CONTAINER_ENGINE"] = engine
+
+        # Demux-style identity: forward opaque ID names/schemes for downstream tools
+        if emer_id_name:
+            env["NESS_ID_NAME"] = emer_id_name
+        if emer_id_scheme:
+            env["NESS_ID_SCHEME"] = emer_id_scheme
+
+        # Forward identity hints for downstream tools (e.g. EmerSSH / EmerSSL aware scripts)
+        emerssh_key = self.headers.get(EMERSSH_HEADER)
+        if emerssh_key:
+            env["NESS_EMERSSH_KEY"] = emerssh_key
+        ssl_serial = self.headers.get(SSL_SERIAL_HEADER)
+        if ssl_serial:
+            env["NESS_SSL_SERIAL"] = ssl_serial
 
         try:
             proc = subprocess.run(
@@ -151,6 +243,30 @@ def run(addr: str = "127.0.0.1", port: int = 8085) -> None:
     httpd = HTTPServer(server_address, MenuHandler)
     print(f"menu-v4.1 HTTP bridge listening on http://{addr}:{port}/api/menu")
     print(f"Using script: {MENU_SCRIPT}")
+
+    if REQUIRED_EMERSSH_KEY:
+        print(
+            f"Auth: expecting EmerSSH public key via {EMERSSH_HEADER} "
+            f"(env {EMERSSH_ENV_VAR})."
+        )
+    elif REQUIRED_SSL_SERIAL:
+        print(
+            f"Auth: expecting SSL serial via {SSL_SERIAL_HEADER} "
+            f"(env {SSL_SERIAL_ENV_VAR})."
+        )
+    elif LEGACY_API_KEY:
+        print(
+            f"Auth: expecting legacy API key via {API_KEY_HEADER} "
+            f"(env {API_KEY_ENV_VAR})."
+        )
+    else:
+        print("No auth secret configured; POST /api/menu will return 401.")
+
+    if not ALLOWED_ORIGINS:
+        print(
+            f"{ALLOWED_ORIGINS_ENV_VAR} is not set; no browser origins are "
+            "allowed by CORS."
+        )
     try:
         httpd.serve_forever()
     except KeyboardInterrupt:

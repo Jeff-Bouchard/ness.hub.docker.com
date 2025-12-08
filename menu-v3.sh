@@ -10,8 +10,21 @@ DOCKER_USER="nessnetwork"
 PROFILE="pi3"            # pi3 | skyminer | full | mcp-server | mcp-client
 DNS_MODE="hybrid"          # icann | hybrid | emerdns
 
-# Host port used for the dns-reverse-proxy listener (matches docker-compose.yml)
-DNS_PROXY_HOST_PORT="${DNS_PROXY_HOST_PORT:-1053}"
+# Path to the Identity Bedrock health check script (EmerNVS checkpoint 696911),
+# defaulting to the sibling EIP4361 repo. Can be overridden via BEDROCK_HEALTH_SCRIPT.
+BEDROCK_HEALTH_SCRIPT="${BEDROCK_HEALTH_SCRIPT:-$SCRIPT_DIR/../EIP4361/scripts/bedrock_health_696911.py}"
+
+# Host port used for the dns-reverse-proxy listener on the host.
+# By default dns-reverse-proxy is meant to be the *system* DNS, so the
+# host stub resolver points to 127.0.0.1:53 (UDP first, TCP fallback).
+DNS_PROXY_HOST_PORT="${DNS_PROXY_HOST_PORT:-53}"
+
+# When running from a Windows host (MINGW/MSYS), we cannot reliably
+# inspect the real system DNS settings from this shell. Instead, we
+# treat /etc/resolv.conf inside this container as the effective
+# "host" resolver and require it to point at 127.0.0.1. Override via
+# RESOLVER_CONTAINER if you want to use a different container.
+RESOLVER_CONTAINER="${RESOLVER_CONTAINER:-ness-unified}"
 
 DNS_LABEL_FILE="$SCRIPT_DIR/.dns_mode_labels"
 DNS_LABEL_ICANN="ICANN-only (deny EmerDNS)"
@@ -560,7 +573,8 @@ stack_menu() {
   echo -e "${green}Stack Control:${reset}"
   echo "  1) Start stack"
   echo "  2) Stop stack"
-   echo "  3) Individual services"
+  echo "  3) Individual services"
+  echo "  4) Identity Bedrock EmerNVS checkpoint (block 696911, ness:therulesoftheinternet)"
   echo "  0) Back"
   echo
   read -rp "Select option: " s_choice
@@ -568,6 +582,7 @@ stack_menu() {
     1) start_stack ;;
     2) compose down; cleanup_dns_reverse_proxy || true; check_port53_free ;;
     3) services_menu ;;
+    4) bedrock_health_menu ;;
     0) return 0 ;;
     *) echo "Invalid option." ;;
   esac
@@ -639,15 +654,126 @@ test_privatenesstools() {
 
 test_dns_reverse_proxy() {
   echo
-  echo -e "${yellow}Testing dns-reverse-proxy listener (ports ${DNS_PROXY_HOST_PORT} and 8053)...${reset}"
-  check_tcp_port 127.0.0.1 "${DNS_PROXY_HOST_PORT}" "dns-reverse-proxy (DNS)" || true
+  echo -e "${yellow}Testing dns-reverse-proxy as system DNS (127.0.0.1:${DNS_PROXY_HOST_PORT} UDP with TCP fallback) and control/API on 8053...${reset}"
+
+  # Prefer a real DNS query over a bare TCP port probe, so we exercise
+  # UDP/53 first with TCP fallback (the same way a normal stub resolver
+  # behaves), then fall back to a generic TCP check if DNS tools are
+  # missing.
+  local dns_ok=1
+  if command -v dig >/dev/null 2>&1; then
+    echo "-- dig @127.0.0.1 ness.cx (UDP, then TCP fallback if needed)"
+    if dig +tries=1 +time=2 @127.0.0.1 ness.cx >/dev/null 2>&1; then
+      echo -e " ${green}${check_ok_symbol}${reset} dns-reverse-proxy answered DNS query via dig"
+      dns_ok=0
+    else
+      echo -e " ${red}${check_fail_symbol}${reset} dig query to dns-reverse-proxy failed; falling back to TCP port probe"
+    fi
+  elif command -v nslookup >/dev/null 2>&1; then
+    echo "-- nslookup ness.cx 127.0.0.1 (UDP, then TCP fallback if needed)"
+    if nslookup ness.cx 127.0.0.1 >/dev/null 2>&1; then
+      echo -e " ${green}${check_ok_symbol}${reset} dns-reverse-proxy answered DNS query via nslookup"
+      dns_ok=0
+    else
+      echo -e " ${red}${check_fail_symbol}${reset} nslookup to dns-reverse-proxy failed; falling back to TCP port probe"
+    fi
+  fi
+
+  if [ "$dns_ok" -ne 0 ]; then
+    check_tcp_port 127.0.0.1 "${DNS_PROXY_HOST_PORT}" "dns-reverse-proxy (DNS)" || true
+  fi
+
   check_tcp_port 127.0.0.1 8053 "dns-reverse-proxy (control/API)" || true
+  check_host_resolver || true
+}
+
+check_host_resolver() {
+  echo
+  echo "== Host resolver (/etc/resolv.conf) =="
+
+  local ns_source="host"
+  local ns_lines rc
+  rc=0
+
+  # Detect Windows/MSYS shells (uname starting with MINGW or MSYS).
+  # In that case, inspect /etc/resolv.conf inside RESOLVER_CONTAINER
+  # instead of the host, since this shell does not represent the real
+  # OS resolver configuration.
+  if uname 2>/dev/null | grep -Eiq '^(MINGW|MSYS)'; then
+    ns_source="container:$RESOLVER_CONTAINER"
+    if command -v docker >/dev/null 2>&1 && \
+       docker ps --format '{{.Names}}' | grep -q "^${RESOLVER_CONTAINER}$"; then
+      ns_lines=$(docker exec "$RESOLVER_CONTAINER" sh -lc \
+        "grep -E '^[[:space:]]*nameserver[[:space:]]+' /etc/resolv.conf 2>/dev/null" || true)
+    else
+      echo "Resolver container $RESOLVER_CONTAINER not running; cannot inspect /etc/resolv.conf inside container."
+      rc=1
+    fi
+  else
+    if [ -r /etc/resolv.conf ]; then
+      ns_lines=$(grep -E '^[[:space:]]*nameserver[[:space:]]+' /etc/resolv.conf 2>/dev/null || true)
+    else
+      echo "/etc/resolv.conf not found or not readable; skipping host resolver check."
+      rc=0
+    fi
+  fi
+
+  if [ -n "$ns_lines" ]; then
+    echo "-- nameserver lines from $ns_source:/etc/resolv.conf --"
+    echo "$ns_lines"
+  else
+    echo "No nameserver lines found in $ns_source:/etc/resolv.conf"
+  fi
+
+  if echo "$ns_lines" | grep -q '127\.0\.0\.1'; then
+    echo -e " ${green}${check_ok_symbol}${reset} $ns_source:/etc/resolv.conf points to 127.0.0.1 (dns-reverse-proxy) as a nameserver"
+    rc=0
+  else
+    echo -e " ${red}${check_fail_symbol}${reset} $ns_source:/etc/resolv.conf does not list 127.0.0.1 as a nameserver"
+    echo "For this Reality profile, configure the effective resolver so that 127.0.0.1 is the primary nameserver (dns-reverse-proxy), with any upstream fallback handled inside the proxy."
+    rc=1
+  fi
+
+  return "$rc"
 }
 
 test_skywire() {
   echo
   echo -e "${yellow}Testing Skywire visor HTTP (port 8000)...${reset}"
   check_tcp_port 127.0.0.1 8000 "Skywire visor"
+}
+
+bedrock_health_menu() {
+  echo
+  echo -e "${yellow}Checking Identity Bedrock EmerNVS checkpoint (block ${CHECKPOINT_HEIGHT:-696911})...${reset}"
+
+  if ! command -v python >/dev/null 2>&1 && ! command -v python3 >/dev/null 2>&1; then
+    echo -e " ${red}${check_fail_symbol}${reset} Python interpreter not found on PATH (required for bedrock_health_696911.py)"
+    return 1
+  fi
+
+  if [ ! -f "$BEDROCK_HEALTH_SCRIPT" ]; then
+    echo -e " ${red}${check_fail_symbol}${reset} Bedrock health script not found at: $BEDROCK_HEALTH_SCRIPT"
+    echo "Set BEDROCK_HEALTH_SCRIPT to override the default path if needed."
+    return 1
+  fi
+
+  local py_cmd="python"
+  if ! command -v python >/dev/null 2>&1 && command -v python3 >/dev/null 2>&1; then
+    py_cmd="python3"
+  fi
+
+  echo "Running: $py_cmd \"$BEDROCK_HEALTH_SCRIPT\""
+  local out rc
+  out=$($py_cmd "$BEDROCK_HEALTH_SCRIPT" 2>&1)
+  rc=$?
+
+  echo "$out"
+  if [ "$rc" -eq 0 ]; then
+    echo -e " ${green}${check_ok_symbol}${reset} Identity Bedrock EmerNVS checkpoint healthy"
+  else
+    echo -e " ${red}${check_fail_symbol}${reset} Identity Bedrock EmerNVS checkpoint check failed (exit code $rc)"
+  fi
 }
 
 health_check() {
@@ -809,6 +935,9 @@ health_check() {
   if docker ps --format '{{.Names}}' | grep -q '^dns-reverse-proxy$'; then
     check_tcp_port 127.0.0.1 "${DNS_PROXY_HOST_PORT}" "dns-reverse-proxy (DNS)" || dns_rc=1
     check_tcp_port 127.0.0.1 8053 "dns-reverse-proxy (control/API)" || dns_rc=1
+    if ! check_host_resolver; then
+      dns_rc=1
+    fi
   else
     echo -e " ${red}${check_fail_symbol}${reset} dns-reverse-proxy container not running"
     dns_rc=1
@@ -842,6 +971,7 @@ test_menu() {
     echo "  3) Test pyuheprng (port 5000)"
     echo "  4) Test dns-reverse-proxy (ports ${DNS_PROXY_HOST_PORT}/8053)"
     echo "  5) Test Skywire visor (port 8000)"
+    echo "  6) Identity Bedrock EmerNVS checkpoint (block 696911, ness:therulesoftheinternet)"
     echo "  0) Back"
     echo
     read -rp "Select an option: " choice
@@ -851,6 +981,7 @@ test_menu() {
       3) test_pyuheprng ;;
       4) test_dns_reverse_proxy ;;
       5) test_skywire ;;
+      6) bedrock_health_menu ;;
       0) return 0 ;;
       *) echo "Invalid choice." ;;
     esac

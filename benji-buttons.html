@@ -5,57 +5,98 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Benji Buttons</title>
   <style>
-    body { background: #101c2a; color: #e0e0e0; font-family: 'Fira Sans', Arial, sans-serif; margin: 0; }
-    .container { max-width: 700px; margin: 40px auto; background: #171f2e; border-radius: 12px; box-shadow: 0 0 12px #0008; padding: 2em 2.5em; text-align: center; }
-    h1 { color: #6ec6ff; margin-bottom: 0.2em; }
-    p.subtitle { color: #9ab6d6; margin-top: 0; margin-bottom: 2em; }
+    body { background: #0f1011; color: #e4e4e4; font-family: 'Fira Sans', Arial, sans-serif; margin: 0; }
+    .container { max-width: 700px; margin: 40px auto; background: #161616; border-radius: 12px; box-shadow: 0 0 22px rgba(0,0,0,0.85); padding: 2em 2.5em; text-align: center; }
+    h1 { color: #f2f2f2; margin-bottom: 0.2em; }
+    p.subtitle { color: #b0b0b0; margin-top: 0; margin-bottom: 2em; }
     .buttons { display: flex; flex-direction: column; gap: 1em; }
     .btn {
       display: inline-block;
       padding: 0.9em 1.4em;
-      border-radius: 8px;
-      border: none;
-      font-size: 1.1em;
+      border-radius: 6px;
+      border: 1px solid #3a3a3a;
+      font-size: 1.05em;
       font-weight: 600;
       cursor: pointer;
-      background: linear-gradient(135deg, #6ec6ff, #2196f3);
-      color: #101c2a;
+      background: #202020;
+      color: #f3f3f3;
       text-decoration: none;
-      transition: transform 0.08s ease-out, box-shadow 0.08s ease-out, background 0.2s ease-in-out;
-      box-shadow: 0 0 0 1px #28334a, 0 10px 25px rgba(0,0,0,0.45);
+      transition: transform 0.08s ease-out, box-shadow 0.08s ease-out, background 0.12s ease-in-out, border-color 0.12s ease-in-out;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.6);
     }
-    .btn:hover { transform: translateY(-1px); box-shadow: 0 14px 30px rgba(0,0,0,0.55); }
-    .btn:active { transform: translateY(0); box-shadow: 0 8px 20px rgba(0,0,0,0.45); background: #2196f3; }
-    .btn.secondary { background: linear-gradient(135deg, #ffb74d, #ff9800); color: #101c2a; }
-    .btn.tertiary { background: linear-gradient(135deg, #ab47bc, #8e24aa); color: #f8f5ff; }
-    .footer { margin-top: 2em; text-align: center; color: #6ec6ff; font-size: 0.95em; }
+    .btn:hover { transform: translateY(-1px); box-shadow: 0 14px 30px rgba(0,0,0,0.75); background: #262626; border-color: #505050; }
+    .btn:active { transform: translateY(0); box-shadow: 0 6px 16px rgba(0,0,0,0.7); background: #1b1b1b; }
+    .btn.secondary { background: #242424; }
+    .btn.tertiary { background: #282828; }
+    .footer { margin-top: 2em; text-align: center; color: #8a8a8a; font-size: 0.95em; }
     .result {
       margin-top: 2em;
       text-align: left;
-      background: #101624;
+      background: #111111;
       border-radius: 8px;
-      border: 1px solid #28334a;
-      padding: 1em 1.2em;
+      border: 1px solid #2a2a2a;
+      padding: 0.75em 0.9em;
       font-family: "Fira Code", monospace;
       font-size: 0.95em;
       max-height: 260px;
+      display: flex;
+      flex-direction: column;
+      gap: 0.4em;
+    }
+    .result-header,
+    .result-footer {
+      display: flex;
+      align-items: center;
+    }
+    .result-header {
+      justify-content: flex-end;
+    }
+    .result-footer {
+      justify-content: space-between;
+      margin-top: 0.25em;
+    }
+    .result-body {
+      flex: 1;
       overflow: auto;
       white-space: pre-wrap;
       word-break: break-word;
+    }
+    .result-action {
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid #3a3a3a;
+      border-radius: 999px;
+      font-family: inherit;
+      font-size: 0.75em;
+      padding: 0.2em 0.8em;
+      color: #c8c8c8;
+      cursor: pointer;
+    }
+    .result-action:hover {
+      background: #262626;
+      color: #ffffff;
     }
     @media (max-width: 800px) { .container { padding: 1.5em 1em; } }
   </style>
 </head>
 <body>
   <div class="container">
-    <h1>Benji Control</h1>
+    <h1>Cheat Control</h1>
     <p class="subtitle">Fetch EmerNVS records via emerapi.info GraphQL: ness:wallet, ness:hub and ness:id.</p>
     <div class="buttons">
-      <button id="benji-wallet" class="btn">Benji &mdash; Wallet (ness:wallet)</button>
-      <button id="benji-hub" class="btn secondary">Benji &mdash; Hub (ness:hub)</button>
-      <button id="benji-id" class="btn tertiary">Benji &mdash; ID (ness:id)</button>
+      <button id="benji-wallet" class="btn">NESS &mdash; Wallet (ness:wallet)</button>
+      <button id="benji-hub" class="btn secondary">NESS &mdash; Hub (ness:hub)</button>
+      <button id="benji-id" class="btn tertiary">NESS &mdash; ID (ness:id)</button>
     </div>
-    <div id="benji-result" class="result" style="display:none;"></div>
+    <div id="benji-result" class="result" style="display:none;">
+      <div class="result-header">
+        <button id="btn-copy-result" class="result-action">Copy</button>
+      </div>
+      <div id="benji-output" class="result-body"></div>
+      <div class="result-footer">
+        <button id="btn-save-result" class="result-action">Save as</button>
+        <button id="btn-open-result" class="result-action">Open as file</button>
+      </div>
+    </div>
     <div class="footer">Privateness.Network &copy; 2025</div>
   </div>
   <script>
@@ -65,6 +106,28 @@
       const data = JSON.stringify({ name });
       // query { callwalletfunction(method:"name_show", data:"{ \"name\": \"ness:wallet\" }") { answer } }
       return `query { callwalletfunction(method: "name_show", data: ${JSON.stringify(data)}) { answer } }`;
+    }
+
+    function extractEmercoinValue(text) {
+      let cleanedText = text;
+      try {
+        cleanedText = text.replace(/[^\x20-\x7E]+/g, '').trim();
+        if (!cleanedText) return '';
+
+        const data = JSON.parse(cleanedText);
+
+        if (data && data.value != null) {
+          return String(data.value);
+        }
+
+        if (data && data.result && data.result.value != null) {
+          return String(data.result.value);
+        }
+
+        return '';
+      } catch (e) {
+        return '';
+      }
     }
 
     async function fetchNvs(name) {
@@ -78,22 +141,29 @@
         throw new Error(JSON.stringify(json.errors, null, 2));
       }
       const answer = json.data && json.data.callwalletfunction && json.data.callwalletfunction.answer;
-      if (!answer || !answer.result) {
-        return JSON.stringify(answer, null, 2);
+      const target = answer && answer.result ? answer.result : answer;
+
+      if (target && typeof target === 'object' && typeof target.value === 'string') {
+        const trimmed = target.value.trim();
+        if (trimmed) return trimmed;
       }
-      const result = answer.result;
-      // Prefer the EmerNVS value field for copy-paste, like the curl line
-      if (typeof result.value === 'string' && result.value.trim() !== '') {
-        return result.value.trim();
-      }
-      // Fallback: show full result JSON
-      return JSON.stringify(result, null, 2);
+
+      const rawResultJson = target != null
+        ? (typeof target === 'string' ? target : JSON.stringify(target))
+        : '';
+      return extractEmercoinValue(rawResultJson);
     }
 
-    function showResult(title, text) {
+    function showResult(text) {
       const box = document.getElementById('benji-result');
+      if (!box) return;
       box.style.display = '';
-      box.textContent = `${title}\n\n${text}`;
+      const body = document.getElementById('benji-output');
+      if (body) {
+        body.textContent = text;
+      } else {
+        box.textContent = text;
+      }
     }
 
     function wireBenji(id, nvsName, label) {
@@ -105,9 +175,10 @@
         btn.textContent = `${orig} …`;
         try {
           const result = await fetchNvs(nvsName);
-          showResult(`${label} (${nvsName})`, result);
+          showResult(result);
         } catch (e) {
-          showResult(`${label} (${nvsName}) - ERROR`, String(e));
+          console.error('Benji fetch error', e);
+          showResult('');
         } finally {
           btn.disabled = false;
           btn.textContent = orig;
@@ -115,9 +186,68 @@
       });
     }
 
+    function setupResultControls() {
+      const getText = () => {
+        const body = document.getElementById('benji-output');
+        return body ? (body.textContent || '') : '';
+      };
+
+      const copyBtn = document.getElementById('btn-copy-result');
+      if (copyBtn) {
+        copyBtn.addEventListener('click', async () => {
+          const text = getText();
+          if (!text) return;
+          if (navigator.clipboard && navigator.clipboard.writeText) {
+            try {
+              await navigator.clipboard.writeText(text);
+              return;
+            } catch (e) {}
+          }
+          const ta = document.createElement('textarea');
+          ta.value = text;
+          ta.style.position = 'fixed';
+          ta.style.left = '-9999px';
+          document.body.appendChild(ta);
+          ta.focus();
+          ta.select();
+          try { document.execCommand('copy'); } catch (e) {}
+          document.body.removeChild(ta);
+        });
+      }
+
+      const saveBtn = document.getElementById('btn-save-result');
+      if (saveBtn) {
+        saveBtn.addEventListener('click', () => {
+          const text = getText();
+          if (!text) return;
+          const blob = new Blob([text], { type: 'text/plain' });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = 'ness-value.txt';
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          setTimeout(() => URL.revokeObjectURL(url), 1000);
+        });
+      }
+
+      const openBtn = document.getElementById('btn-open-result');
+      if (openBtn) {
+        openBtn.addEventListener('click', () => {
+          const text = getText();
+          if (!text) return;
+          const blob = new Blob([text], { type: 'text/plain' });
+          const url = URL.createObjectURL(blob);
+          window.open(url, '_blank');
+        });
+      }
+    }
+
     wireBenji('benji-wallet', 'ness:wallet', 'EmerNVS Wallet');
     wireBenji('benji-hub', 'ness:hub', 'EmerNVS Hub');
     wireBenji('benji-id', 'ness:id', 'EmerNVS ID');
+    setupResultControls();
   </script>
 </body>
 </html>
