@@ -24,13 +24,25 @@
       transition: transform 0.08s ease-out, box-shadow 0.08s ease-out, background 0.12s ease-in-out, border-color 0.12s ease-in-out;
       box-shadow: 0 10px 25px rgba(0,0,0,0.6);
     }
+<<<<<<< HEAD
     .btn:hover { transform: translateY(-1px); box-shadow: 0 14px 30px rgba(0,0,0,0.75); background: #262626; border-color: #505050; }
     .btn:active { transform: translateY(0); box-shadow: 0 6px 16px rgba(0,0,0,0.7); background: #1b1b1b; }
     .btn.secondary { background: #242424; }
     .btn.tertiary { background: #282828; }
     .footer { margin-top: 2em; text-align: center; color: #8a8a8a; font-size: 0.95em; }
     .result {
+=======
+    .btn:hover { transform: translateY(-1px); box-shadow: 0 14px 30px rgba(0,0,0,0.55); }
+    .btn:active { transform: translateY(0); box-shadow: 0 8px 20px rgba(0,0,0,0.45); background: #2196f3; }
+    .btn.secondary { background: linear-gradient(135deg, #ffb74d, #ff9800); color: #101c2a; }
+    .btn.tertiary { background: linear-gradient(135deg, #ab47bc, #8e24aa); color: #f8f5ff; }
+    .footer { margin-top: 2em; text-align: center; color: #6ec6ff; font-size: 0.95em; }
+    .result-wrapper {
+>>>>>>> a8afaec68475909d134d29a27cccd7d69ac140e2
       margin-top: 2em;
+      position: relative;
+    }
+    .result {
       text-align: left;
       background: #111111;
       border-radius: 8px;
@@ -61,6 +73,7 @@
       white-space: pre-wrap;
       word-break: break-word;
     }
+<<<<<<< HEAD
     .result-action {
       background: rgba(255, 255, 255, 0.04);
       border: 1px solid #3a3a3a;
@@ -74,12 +87,54 @@
     .result-action:hover {
       background: #262626;
       color: #ffffff;
+=======
+    .copy-btn {
+      position: absolute;
+      top: 6px;
+      right: 8px;
+      padding: 0.2em 0.6em;
+      font-size: 0.8em;
+      border-radius: 4px;
+      border: none;
+      background: #2b85d3;
+      color: #f5faff;
+      cursor: pointer;
+    }
+    .copy-btn:hover {
+      background: #47a0ec;
+    }
+    .copy-btn:active {
+      background: #1f6ea8;
+    }
+    .result-actions {
+      position: absolute;
+      right: 8px;
+      bottom: 6px;
+      display: flex;
+      gap: 0.4em;
+      font-size: 0.8em;
+    }
+    .action-btn {
+      padding: 0.15em 0.6em;
+      border-radius: 4px;
+      border: none;
+      background: #263146;
+      color: #f5faff;
+      cursor: pointer;
+    }
+    .action-btn:hover {
+      background: #36425a;
+    }
+    .action-btn:active {
+      background: #1b2435;
+>>>>>>> a8afaec68475909d134d29a27cccd7d69ac140e2
     }
     @media (max-width: 800px) { .container { padding: 1.5em 1em; } }
   </style>
 </head>
 <body>
   <div class="container">
+<<<<<<< HEAD
     <h1>Cheat Control</h1>
     <p class="subtitle">Fetch EmerNVS records via emerapi.info GraphQL: ness:wallet, ness:hub and ness:id.</p>
     <div class="buttons">
@@ -95,12 +150,28 @@
       <div class="result-footer">
         <button id="btn-save-result" class="result-action">Save as</button>
         <button id="btn-open-result" class="result-action">Open as file</button>
+=======
+    <h1>Privateness Persona</h1>
+    <p class="subtitle">Fetch EmerNVS records via emerapi.info GraphQL: ness:wallet, ness:hub and ness:id.</p>
+    <div class="buttons">
+      <button id="benji-wallet" class="btn">Quickstart &mdash; Wallet (ness:wallet)</button>
+      <button id="benji-hub" class="btn secondary">Containers &mdash; Hub (ness:hub)</button>
+      <button id="benji-id" class="btn tertiary">Bedrock Identity Creation Wizard HTML code&mdash; ID (ness:id)</button>
+    </div>
+    <div id="benji-result-wrapper" class="result-wrapper" style="display:none;">
+      <button id="benji-copy" class="copy-btn">COPY</button>
+      <div id="benji-result" class="result"></div>
+      <div class="result-actions">
+        <button id="benji-save" class="action-btn">save as file</button>
+        <button id="benji-open-html" class="action-btn">open as html</button>
+>>>>>>> a8afaec68475909d134d29a27cccd7d69ac140e2
       </div>
     </div>
     <div class="footer">Privateness.Network &copy; 2025</div>
   </div>
   <script>
     const API_URL = 'https://emerapi.info/graphql';
+    let currentNvsName = null;
 
     function formatQuery(name) {
       const data = JSON.stringify({ name });
@@ -141,6 +212,7 @@
         throw new Error(JSON.stringify(json.errors, null, 2));
       }
       const answer = json.data && json.data.callwalletfunction && json.data.callwalletfunction.answer;
+<<<<<<< HEAD
       const target = answer && answer.result ? answer.result : answer;
 
       if (target && typeof target === 'object' && typeof target.value === 'string') {
@@ -164,6 +236,39 @@
       } else {
         box.textContent = text;
       }
+=======
+      console.log('Answer type:', typeof answer, answer);
+      
+      // If answer is a string, parse it first
+      let parsedAnswer = answer;
+      if (typeof answer === 'string') {
+        parsedAnswer = JSON.parse(answer);
+      }
+      
+      if (!parsedAnswer || !parsedAnswer.result) {
+        return JSON.stringify(parsedAnswer, null, 2);
+      }
+      const result = parsedAnswer.result;
+      // Prefer the EmerNVS value field and parse it like emercoin-value.py
+      if (typeof result.value === 'string' && result.value.trim() !== '') {
+        // The value field contains the actual command string
+        return result.value.trim();
+      }
+      // Fallback: show full result JSON
+      return JSON.stringify(result, null, 2);
+    }
+
+    function showResult(title, text) {
+      const wrapper = document.getElementById('benji-result-wrapper');
+      const box = document.getElementById('benji-result');
+      if (!box) return;
+      if (wrapper) {
+        wrapper.style.display = '';
+      }
+      // Show ONLY the command text, no title or description
+      box.textContent = text;
+      box.dataset.copyPayload = text;
+>>>>>>> a8afaec68475909d134d29a27cccd7d69ac140e2
     }
 
     function wireBenji(id, nvsName, label) {
@@ -175,10 +280,17 @@
         btn.textContent = `${orig} …`;
         try {
           const result = await fetchNvs(nvsName);
+<<<<<<< HEAD
           showResult(result);
         } catch (e) {
           console.error('Benji fetch error', e);
           showResult('');
+=======
+          currentNvsName = nvsName;
+          showResult('', result);
+        } catch (e) {
+          showResult('', String(e));
+>>>>>>> a8afaec68475909d134d29a27cccd7d69ac140e2
         } finally {
           btn.disabled = false;
           btn.textContent = orig;
@@ -186,6 +298,7 @@
       });
     }
 
+<<<<<<< HEAD
     function setupResultControls() {
       const getText = () => {
         const body = document.getElementById('benji-output');
@@ -240,6 +353,87 @@
           const blob = new Blob([text], { type: 'text/plain' });
           const url = URL.createObjectURL(blob);
           window.open(url, '_blank');
+=======
+    function getResultPayload() {
+      const box = document.getElementById('benji-result');
+      if (!box) return '';
+      return (box.dataset && box.dataset.copyPayload) || box.textContent || '';
+    }
+
+    function setupCopy() {
+      const btn = document.getElementById('benji-copy');
+      if (!btn || !navigator.clipboard) return;
+      btn.addEventListener('click', async () => {
+        const payload = getResultPayload();
+        if (!payload) return;
+        try {
+          await navigator.clipboard.writeText(payload.trim());
+          const original = btn.textContent;
+          btn.textContent = 'COPIED';
+          setTimeout(() => {
+            btn.textContent = original;
+          }, 1200);
+        } catch (e) {
+          console.error(e);
+        }
+      });
+    }
+
+    function escapeHtml(text) {
+      return text
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+    }
+
+    function setupResultActions() {
+      const saveBtn = document.getElementById('benji-save');
+      const openBtn = document.getElementById('benji-open-html');
+      if (!saveBtn && !openBtn) return;
+
+      if (saveBtn) {
+        saveBtn.addEventListener('click', () => {
+          const payload = getResultPayload();
+          if (!payload) return;
+          const trimmed = payload.trim();
+          const isHtml = /^\s*</.test(trimmed);
+
+          const baseRaw = currentNvsName || 'benji-output';
+          const baseName = baseRaw.replace(/:/g, '-');
+          const ua = navigator.userAgent || '';
+          const isWindows = /Windows/i.test(ua);
+          const ext = isHtml ? '.html' : (isWindows ? '.bat' : '.sh');
+          const filename = baseName + ext;
+
+          const blob = new Blob([trimmed + '\n'], { type: 'text/plain;charset=utf-8' });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = filename;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          URL.revokeObjectURL(url);
+        });
+      }
+
+      if (openBtn) {
+        openBtn.addEventListener('click', () => {
+          const payload = getResultPayload();
+          if (!payload) return;
+          const trimmed = payload.trim();
+          const win = window.open('', '_blank');
+          if (!win) return;
+          win.document.open();
+          if (/^\s*</.test(trimmed)) {
+            win.document.write(trimmed);
+          } else {
+            win.document.write('<!DOCTYPE html><html><head><meta charset="utf-8"><title>Benji Output</title></head><body><pre>');
+            win.document.write(escapeHtml(trimmed));
+            win.document.write('</pre></body></html>');
+          }
+          win.document.close();
+>>>>>>> a8afaec68475909d134d29a27cccd7d69ac140e2
         });
       }
     }
@@ -247,7 +441,12 @@
     wireBenji('benji-wallet', 'ness:wallet', 'EmerNVS Wallet');
     wireBenji('benji-hub', 'ness:hub', 'EmerNVS Hub');
     wireBenji('benji-id', 'ness:id', 'EmerNVS ID');
+<<<<<<< HEAD
     setupResultControls();
+=======
+    setupCopy();
+    setupResultActions();
+>>>>>>> a8afaec68475909d134d29a27cccd7d69ac140e2
   </script>
 </body>
 </html>
