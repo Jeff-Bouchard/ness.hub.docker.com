@@ -144,12 +144,46 @@ services:
     depends_on:
       - emercoin-core
 
+  htcondor-cm:
+    image: nessnetwork/htcondor-cm
+    container_name: htcondor-cm
+    environment:
+      - CONDOR_HOST=htcondor-cm
+    volumes:
+      - htcondor-cm-data:/var/lib/condor
+    restart: unless-stopped
+
+  htcondor-submit:
+    image: nessnetwork/htcondor-submit
+    container_name: htcondor-submit
+    environment:
+      - CONDOR_HOST=htcondor-cm
+    volumes:
+      - htcondor-submit-data:/var/lib/condor
+    restart: unless-stopped
+    depends_on:
+      - htcondor-cm
+
+  htcondor-execute:
+    image: nessnetwork/htcondor-execute
+    container_name: htcondor-execute
+    environment:
+      - CONDOR_HOST=htcondor-cm
+    volumes:
+      - htcondor-execute-data:/var/lib/condor
+    restart: unless-stopped
+    depends_on:
+      - htcondor-cm
+
 volumes:
   emercoin-data:
   yggdrasil-data:
   i2p-data:
   skywire-data:
   awg-config:
+  htcondor-cm-data:
+  htcondor-submit-data:
+  htcondor-execute-data:
 
 networks:
   default:

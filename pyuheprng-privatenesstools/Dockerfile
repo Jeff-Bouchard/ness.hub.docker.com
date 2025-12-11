@@ -24,12 +24,12 @@ RUN git clone https://github.com/ness-network/privatenesstools.git /app/privaten
     && cd /app/privatenesstools \
     && pip install --no-cache-dir -r requirements.txt
 
-# Environment variables for Emercoin connection
+# Environment variables for Emercoin connection and entropy control
 ENV EMERCOIN_HOST=emercoin-core \
     EMERCOIN_PORT=6662 \
     EMERCOIN_USER=rpcuser \
     EMERCOIN_PASS=rpcpassword \
-    MIN_ENTROPY_RATE=1000 \
+    MIN_ENTROPY_RATE=128 \
     BLOCK_ON_LOW_ENTROPY=true
 
 # Copy supervisor configuration

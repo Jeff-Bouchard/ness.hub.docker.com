@@ -19,13 +19,9 @@ TIER1_IMAGES=(
 
 TIER2_PLATFORMS="linux/amd64,linux/arm64"
 TIER2_IMAGES=(
-  "amneziawg"
-  "skywire-amneziawg"
-  "amnezia-exit"
   "yggdrasil"
   "ipfs"
   "i2p-yggdrasil"
-  "ness-unified"
 )
 
 TIER3_PLATFORMS="linux/amd64,linux/arm64"
@@ -41,6 +37,13 @@ TIER4_IMAGES=(
   "privateness-mcp-app"
   "magic-wormhole-suite"
   "inspector"
+)
+
+TIER5_PLATFORMS="linux/amd64"
+TIER5_IMAGES=(
+  "htcondor-cm"
+  "htcondor-submit"
+  "htcondor-execute"
 )
 
 ensure_builder() {
@@ -88,5 +91,8 @@ build_group "$TIER3_PLATFORMS" "${TIER3_IMAGES[@]}"
 
 echo "Building Tier 4 (MCP servers/apps + inspector) images..."
 build_group "$TIER4_PLATFORMS" "${TIER4_IMAGES[@]}"
+
+echo "Building Tier 5 (HTCondor pool images, amd64 only)..."
+build_group "$TIER5_PLATFORMS" "${TIER5_IMAGES[@]}"
 
 echo "\nAll multi-architecture images built and pushed successfully!"

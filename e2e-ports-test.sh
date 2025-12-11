@@ -16,12 +16,8 @@ TIER1_IMAGES=(
 )
 
 TIER2_IMAGES=(
-  "amneziawg"
-  "skywire-amneziawg"
-  "amnezia-exit"
   "yggdrasil"
   "i2p-yggdrasil"
-  "ness-unified"
 )
 
 # By default we test Tier 1 images only (Tier 2 relies on full-stack logs)

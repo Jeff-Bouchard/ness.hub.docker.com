@@ -217,25 +217,6 @@
       background: #555a71;
     }
 
-    .status-strip {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 8px;
-      margin-top: 6px;
-    }
-
-    .status-pill {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      font-size: 0.78rem;
-      padding: 4px 10px;
-      border-radius: 999px;
-      background: var(--bg-chip);
-      border: 1px solid rgba(255, 255, 255, 0.08);
-      color: var(--text-muted);
-    }
-
     .buttons-row {
       display: flex;
       flex-wrap: wrap;
@@ -330,21 +311,7 @@
         </div>
         <div class="badge-row">
           <div class="badge"><strong>CORE</strong><span>Emercoin · NESS · DNS · Entropy</span></div>
-          <div class="badge"><strong>OVERLAYS</strong><span>Yggdrasil · I2P · Skywire</span></div>
-        </div>
-      </div>
-      <div class="status-strip">
-        <div class="status-pill">
-          <span class="status-dot status-unknown" data-status-dot="dns-mode"></span>
-          <span class="status-text" data-status-text="dns-mode">Reality: Unknown</span>
-        </div>
-        <div class="status-pill">
-          <span class="status-dot status-unknown" data-status-dot="dns-realities"></span>
-          <span class="status-text" data-status-text="dns-realities">DNS invariants: Unknown</span>
-        </div>
-        <div class="status-pill">
-          <span class="status-dot status-unknown" data-status-dot="full-e2e"></span>
-          <span class="status-text" data-status-text="full-e2e">Full node E2E: Unknown</span>
+          <div class="badge"><strong>OVERLAYS</strong><span>Yggdrasil · I2P · Skywire · AmneziaWG</span></div>
         </div>
       </div>
     </section>
@@ -445,22 +412,6 @@
           </div>
         </article>
 
-        <!-- HTCondor pool -->
-        <article class="card service-card">
-          <div class="card-header">
-            <h3>HTCondor pool</h3>
-            <small>Central manager, submit, execute</small>
-          </div>
-          <div class="status-row">
-            <span class="status-dot status-unknown" data-status-dot="htcondor"></span>
-            <span class="status-text" data-status-text="htcondor">Unknown</span>
-          </div>
-          <p class="service-meta">This indicator is reserved for an HTCondor pool control endpoint; it will remain Unknown until a dedicated port is configured.</p>
-          <div class="buttons-row">
-            <button class="small" type="button" id="btnHtcondorRest">Details</button>
-          </div>
-        </article>
-
         <!-- Skywire visor -->
         <article class="card service-card">
           <div class="card-header">
@@ -474,6 +425,22 @@
           <p class="service-meta">Open the Skywire visor dashboard (plain visor container).</p>
           <div class="buttons-row">
             <button class="small" type="button" id="btnSkywireUi">Open visor UI</button>
+          </div>
+        </article>
+
+        <!-- Skywire over AmneziaWG -->
+        <article class="card service-card">
+          <div class="card-header">
+            <h3>Skywire over AmneziaWG</h3>
+            <small>Visor bound to AmneziaWG tunnel</small>
+          </div>
+          <div class="status-row">
+            <span class="status-dot status-unknown" data-status-dot="skywire-amn"></span>
+            <span class="status-text" data-status-text="skywire-amn">Unknown</span>
+          </div>
+          <p class="service-meta">Open the Skywire visor that is bound to the AmneziaWG tunnel.</p>
+          <div class="buttons-row">
+            <button class="small" type="button" id="btnSkyAmnUi">Open visor UI</button>
           </div>
         </article>
 
@@ -493,21 +460,6 @@
           </div>
         </article>
 
-        <!-- Remote Emercoin / Privateness API (GraphQL) -->
-        <article class="card service-card">
-          <div class="card-header">
-            <h3>Emercoin-cli | PrivateNess-cli</h3>
-            <small>EmerAPI.info is a Trusted Emercoin GraphQL system</small>
-          </div>
-          <p class="service-meta">
-            Use this remote when no local Emercoin core is available. It calls a 100% trusted Emercoin GraphQL system at
-            <a href="https://emerapi.info/graphql" target="_blank" rel="noreferrer">Emercoin GraphQL endpoint</a>.
-          </p>
-          <div class="buttons-row">
-            <button class="small" type="button" id="btnEmerApiTemplate">Open API template</button>
-          </div>
-        </article>
-
         <!-- Emercoin RPC note -->
         <article class="card service-card">
           <div class="card-header">
@@ -516,8 +468,7 @@
           </div>
           <p class="service-meta">
             Emercoin JSON-RPC on 6662 uses a cookie for auth inside the container, which browsers cannot access safely.
-            For local control, prefer the <code>./emercoin-cli</code> wrapper or a trusted Emercoin GraphQL endpoint at
-            <a href="https://emerapi.info/graphql" target="_blank" rel="noreferrer">Emercoin GraphQL endpoint</a>.
+            For local control, prefer the <code>./emercoin-cli</code> wrapper or GraphQL at <a href="https://emerapi.info/graphql" target="_blank" rel="noreferrer">emerapi.info</a>.
           </p>
         </article>
       </div>
@@ -562,39 +513,6 @@
       var cls = state === "ok" ? "status-ok" : state === "fail" ? "status-fail" : "status-unknown";
       dot.classList.add(cls);
       text.textContent = message;
-    }
-
-    async function probeServiceStatus(id, port, path) {
-      const url = BASE_ORIGIN + ":" + String(port) + path;
-      try {
-        const res = await fetch(url, { method: "GET" });
-        if (res.ok) {
-          setStatus(id, "ok", "Online");
-        } else {
-          setStatus(id, "fail", "HTTP " + res.status);
-        }
-      } catch (_) {
-        setStatus(id, "fail", "Offline");
-      }
-    }
-
-    function startStatusPolling() {
-      async function tick() {
-        await Promise.all([
-          probeServiceStatus("privateness", 6006, "/"),
-          probeServiceStatus("pyuheprng", 5000, "/health"),
-          probeServiceStatus("privatenesstools", 8888, "/health"),
-          probeServiceStatus("dns", 8053, "/"),
-          probeServiceStatus("skywire", 8000, "/"),
-          probeServiceStatus("i2p", 7657, "/"),
-          updateRealityStripFromStatus()
-        ]);
-      }
-
-      tick().catch(function () {});
-      setInterval(function () {
-        tick().catch(function () {});
-      }, 15000);
     }
 
     function openService(label, url, statusId) {
@@ -698,7 +616,7 @@
       var btnOpenNessGui = document.getElementById("btnOpenNessGui");
       if (btnOpenNessGui) {
         btnOpenNessGui.addEventListener("click", function () {
-          openService("Open NESS GUI", BASE_ORIGIN + ":6660", "privateness");
+          openService("Open NESS GUI", BASE_ORIGIN + ":6006", "privateness");
         });
       }
 
@@ -751,79 +669,20 @@
         });
       }
 
+      var btnSkyAmnUi = document.getElementById("btnSkyAmnUi");
+      if (btnSkyAmnUi) {
+        btnSkyAmnUi.addEventListener("click", function () {
+          openService("Open Skywire-AmneziaWG visor", BASE_ORIGIN + ":8002", "skywire-amn");
+        });
+      }
+
       var btnI2pConsole = document.getElementById("btnI2pConsole");
       if (btnI2pConsole) {
         btnI2pConsole.addEventListener("click", function () {
           openService("Open I2P console", BASE_ORIGIN + ":7657", "i2p");
         });
       }
-
-      var btnHtcondorRest = document.getElementById("btnHtcondorRest");
-      if (btnHtcondorRest) {
-        btnHtcondorRest.addEventListener("click", function () {
-          logDivider("HTCondor pool");
-          log("No HTCondor control endpoint is configured yet. Configure a dedicated port for HTCondor and update this dashboard binding.", "info");
-        });
-      }
-
-      var btnEmerApiTemplate = document.getElementById("btnEmerApiTemplate");
-      if (btnEmerApiTemplate) {
-        btnEmerApiTemplate.addEventListener("click", function () {
-          openService("Emercoin-cli | PrivateNess-cli API", "index-load.html");
-        });
-      }
     })();
-
-    function initRealityStrip() {
-      setStatus("dns-mode", "unknown", "Reality: Unknown");
-      setStatus("dns-realities", "unknown", "DNS invariants: Unknown");
-      setStatus("full-e2e", "unknown", "Full node E2E: Unknown");
-    }
-
-    async function updateRealityStripFromStatus() {
-      const url = "http://" + BASE_HOST + ":50880/status";
-      try {
-        const res = await fetch(url, { method: "GET" });
-        const text = await res.text();
-        if (!res.ok) {
-          logDivider("Status HTTP /status");
-          log(`HTTP ${res.status} ${res.statusText}: ${text.slice(0, 4000)}`, "error");
-          return;
-        }
-        let data;
-        try {
-          data = JSON.parse(text);
-        } catch (e) {
-          logDivider("Status HTTP /status");
-          log("Failed to parse /status JSON: " + String(e), "error");
-          return;
-        }
-
-        var dnsModeLabel = "Reality: Unknown";
-        if (data && typeof data.dns_mode === "string" && data.dns_mode.length > 0) {
-          dnsModeLabel = "Reality: " + data.dns_mode;
-        }
-        setStatus("dns-mode", data && data.dns_mode ? "ok" : "unknown", dnsModeLabel);
-
-        if (data && data.dns_realities) {
-          var drOk = !!data.dns_realities.ok;
-          var drSummary = data.dns_realities.summary || (drOk ? "DNS invariants: OK" : "DNS invariants: FAIL");
-          setStatus("dns-realities", drOk ? "ok" : "fail", drSummary);
-        }
-
-        if (data && data.full_e2e) {
-          var feOk = !!data.full_e2e.ok;
-          var feSummary = data.full_e2e.summary || (feOk ? "Full node E2E: OK" : "Full node E2E: FAIL");
-          setStatus("full-e2e", feOk ? "ok" : "fail", feSummary);
-        }
-      } catch (err) {
-        logDivider("Status HTTP /status");
-        log("Request to /status failed: " + err.message, "error");
-      }
-    }
-
-    initRealityStrip();
-    startStatusPolling();
   </script>
 </body>
 </html>

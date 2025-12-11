@@ -240,15 +240,33 @@ p.prototype.mapData=function(a,c){for(var b=-1,d=this.moduleCount-1,e=7,f=0,g=th
           body: JSON.stringify({ query })
         });
         const json = await res.json();
-        const answer = json && json.data && json.data.callwalletfunction && json.data.callwalletfunction.answer;
+        let answer = json && json.data && json.data.callwalletfunction && json.data.callwalletfunction.answer;
+        console.log("RAW JSON:", json);
+        console.log("ANSWER:", answer);
         if (!answer) {
           setCommand(DEFAULT_BOOTSTRAP, "No answer from emerapi; using default.");
           return;
         }
 
-        // From your screenshots, answer looks like:
-        // { result: { name: "ness:wallet", value: "..." , ... }, error: null, id: null }
-        const result = answer.result;
+        let parsed;
+        if (typeof answer === "string") {
+          try {
+            parsed = JSON.parse(answer);
+          } catch (e) {
+            const txt = answer.trim();
+            if (txt) {
+              setCommand(txt, `Loaded raw string from NVS key ${key}.`);
+              return;
+            }
+            setCommand(DEFAULT_BOOTSTRAP, "Could not decode answer JSON; using default.");
+            return;
+          }
+        } else {
+          parsed = answer;
+        }
+        console.log("PARSED_ANSWER:", parsed);
+
+        let result = parsed && parsed.result != null ? parsed.result : parsed;
         let value = "";
         if (Array.isArray(result)) {
           if (result.length > 0 && result[0] && result[0].value != null) {
