@@ -347,18 +347,30 @@ start_stack() {
   echo -e "${yellow}Starting Ness stack (Profile: $(profile_label "$PROFILE"))...${reset}"
   require_docker || return 1
 
+  # Run preflight port conflict check
+  if [ -x "./resolve_port_conflicts.sh" ]; then
+    echo -e "${yellow}Running preflight port conflict check...${reset}"
+    ./resolve_port_conflicts.sh || {
+      echo -e "${red}Preflight check failed. Aborting stack start.${reset}"
+      return 1
+    }
+  else
+    echo -e "${red}Preflight script missing. Run manually: ./resolve_port_conflicts.sh${reset}"
+    return 1
+  fi
+
   # Always start from a clean slate for this compose project
   ensure_stack_stopped || return 1
 
-   # Also ensure no leftover dns-reverse-proxy container is still binding UDP/53
-   cleanup_dns_reverse_proxy || true
+  # Also ensure no leftover dns-reverse-proxy container is still binding UDP/53
+  cleanup_dns_reverse_proxy || true
 
-   # Hard-fail if the DNS listener port is already taken by something we don't control
-   if is_port53_busy; then
-     echo -e "${red}Cannot start stack:${reset} port ${DNS_PROXY_HOST_PORT} (TCP/UDP) is already in use on the host."
-     echo -e "${yellow}Hint:${reset} check for local DNS services or previous runs holding :${DNS_PROXY_HOST_PORT}."
-     return 1
-   fi
+  # Hard-fail if the DNS listener port is already taken by something we don't control
+  if is_port53_busy; then
+    echo -e "${red}Cannot start stack:${reset} port ${DNS_PROXY_HOST_PORT} (TCP/UDP) is already in use on the host."
+    echo -e "${yellow}Hint:${reset} check for local DNS services or previous runs holding :${DNS_PROXY_HOST_PORT}."
+    return 1
+  fi
 
   case "$PROFILE" in
     pi3)
@@ -402,8 +414,11 @@ stack_status() {
   compose ps || true
 
   echo
-  echo -e "${green}Key service statuses:${reset}"
-  local svc label status color
+  echo -e "${green}Service Status Summary${reset}"
+  printf "${panel_fg}%-24s %-10s %s${reset}\n" "Service" "Status" "Details"
+  echo -e "${panel_border}──────────────────────────────────────────────${reset}"
+  
+  local svc label status color details
   local pairs=(
     "emercoin-core:Emercoin Core"
     "privateness:Privateness"
@@ -422,12 +437,13 @@ stack_status() {
     label=${pair#*:}
     status=$(service_status "$svc")
     case "$status" in
-      RUNNING) color="$green" ;;
-      STOPPED) color="$red" ;;
-      *)       color="$yellow" ;;
+      RUNNING) color="$green"; details="Operational" ;;
+      STOPPED) color="$red"; details="Stopped" ;;
+      *) color="$yellow"; details="Not deployed" ;;
     esac
-    printf "  %-24s %b%s%b\n" "$label" "$color" "$status" "$reset"
+    printf "${panel_fg}%-24s ${color}%-10s${reset} %s\n" "$label" "$status" "$details"
   done
+  echo
 }
 
 logs_stack() {
@@ -655,7 +671,7 @@ stack_menu() {
   echo -e "${green}Stack Control:${reset}"
   echo "  1) Start stack"
   echo "  2) Stop stack"
-   echo "  3) Individual services"
+  echo "  3) Individual services"
   echo "  0) Back"
   echo " 99) Exit (to shell)"
   echo
@@ -1282,7 +1298,8 @@ api_dispatch() {
         return 1
       fi
       local docker_user="${DOCKER_USER:-nessnetwork}"
-      echo "Building ${docker_user}/${IMAGE}:latest from ${context_path}..."
+      echo
+      echo -e "${yellow}Building ${docker_user}/${IMAGE}:latest from ${context_path}..."
       docker build -t "${docker_user}/${IMAGE}:latest" "$context_path" ;;
     health-check)
       health_check ;;
@@ -1340,10 +1357,11 @@ print_header() {
   echo
   logo 2>/dev/null || true
   echo
-  echo "NESS v4 menu (basic mode)"
-  echo "  Profile : $(profile_label "$PROFILE")"
-  echo "  Reality : ${DNS_MODE} (${DNS_DESC:-})"
-  echo
+  echo -e "${primary}========================================${reset}"
+  echo -e "${title_glow}        N E S S   v0.4   Control Panel        ${reset}"
+  echo -e "${primary}========================================${reset}"
+  echo -e " Profile: ${accent}$(profile_label "$PROFILE")${reset} | DNS Mode: ${accent}$DNS_MODE${reset}"
+  echo -e "${panel_bg}${panel_border}────────────────────────────────────────${reset}"
 }
 
 menu() {

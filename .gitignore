@@ -1,0 +1,2 @@
+.env
+resolve_port_conflicts.bat  # Removed Windows version
