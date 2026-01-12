@@ -533,8 +533,9 @@
   </div>
 
   <script>
-    const BASE_HOST = "hub.private.ness";
-    const BASE_ORIGIN = "http://" + BASE_HOST;
+    const BASE_HOST = window.location.hostname || "localhost";
+    const BASE_ORIGIN = window.location.protocol + "//" + BASE_HOST;
+    const STATUS_PORT = 50880;
     const logPane = document.getElementById("logPane");
 
     function log(message, level = "info") {
@@ -781,7 +782,7 @@
     }
 
     async function updateRealityStripFromStatus() {
-      const url = "http://" + BASE_HOST + ":50880/status";
+      const url = BASE_ORIGIN + ":" + STATUS_PORT + "/status";
       try {
         const res = await fetch(url, { method: "GET" });
         const text = await res.text();

@@ -10,80 +10,80 @@ services:
     image: nessnetwork/emercoin-core:latest
     container_name: emercoin-core
     ports:
-      - "6661:6661"
-      - "6662:6662"
-      - "8775:8775"
+    - "6661:6661"
+    - "6662:6662"
+    - "8775:8775"
     volumes:
-      - emercoin-data:/data
+    - emercoin-data:/data
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "emercoin-cli", "-datadir=/data", "getinfo"]
+      test: [ "CMD", "emercoin-cli", "-datadir=/data", "getinfo" ]
       interval: 30s
       timeout: 10s
       retries: 5
       start_period: 60s
     labels:
-      - "io.portainer.accesscontrol.teams=privateness"
-      - "com.privateness.service=blockchain"
-      - "com.privateness.layer=foundation"
-      - "com.privateness.tier=1"
+    - "io.portainer.accesscontrol.teams=privateness"
+    - "com.privateness.service=blockchain"
+    - "com.privateness.layer=foundation"
+    - "com.privateness.tier=1"
 
   dns-reverse-proxy:
     image: nessnetwork/dns-reverse-proxy:latest
     container_name: dns-reverse-proxy
     ports:
-      - "53:53/udp"
-      - "53:53/tcp"
-      - "8053:8053"
+    - "53:53/udp"
+    - "53:53/tcp"
+    - "8053:8053"
     restart: unless-stopped
     labels:
-      - "io.portainer.accesscontrol.teams=privateness"
-      - "com.privateness.service=dns"
-      - "com.privateness.layer=application"
-      - "com.privateness.tier=1"
+    - "io.portainer.accesscontrol.teams=privateness"
+    - "com.privateness.service=dns"
+    - "com.privateness.layer=application"
+    - "com.privateness.tier=1"
     depends_on:
-      - emercoin-core
+    - emercoin-core
 
   privateness:
     image: nessnetwork/privateness:latest
     container_name: privateness
     ports:
-      - "6006:6006"
-      - "6660:6660"
+    - "6006:6006"
+    - "6660:6660"
     restart: unless-stopped
     labels:
-      - "io.portainer.accesscontrol.teams=privateness"
-      - "com.privateness.service=core"
-      - "com.privateness.layer=application"
-      - "com.privateness.tier=1"
+    - "io.portainer.accesscontrol.teams=privateness"
+    - "com.privateness.service=core"
+    - "com.privateness.layer=application"
+    - "com.privateness.tier=1"
     depends_on:
-      - emercoin-core
-      - dns-reverse-proxy
+    - emercoin-core
+    - dns-reverse-proxy
 
   pyuheprng:
     image: nessnetwork/pyuheprng:latest
     container_name: pyuheprng
     privileged: true
     devices:
-      - /dev/random
+    - /dev/random
     volumes:
-      - /dev:/dev
+    - /dev:/dev
+    - emercoin-data:/data:ro
     ports:
-      - "5000:5000"
+    - "5000:5000"
     restart: unless-stopped
     environment:
-      - EMERCOIN_HOST=emercoin-core
-      - EMERCOIN_PORT=6662
-      - EMERCOIN_USER=${EMERCOIN_RPC_USER:-rpcuser}
-      - EMERCOIN_PASS=${EMERCOIN_RPC_PASS:-rpcpassword}
-      - MIN_ENTROPY_RATE=1000
-      - BLOCK_ON_LOW_ENTROPY=true
+    - EMERCOIN_HOST=emercoin-core
+    - EMERCOIN_PORT=6662
+    - EMERCOIN_COOKIE_FILE=/data/.cookie
+    - MIN_ENTROPY_RATE=1000
+    - BLOCK_ON_LOW_ENTROPY=true
     labels:
-      - "io.portainer.accesscontrol.teams=privateness"
-      - "com.privateness.service=entropy"
-      - "com.privateness.layer=security"
-      - "com.privateness.description=Cryptographic entropy - feeds /dev/random"
-      - "com.privateness.tier=1"
+    - "io.portainer.accesscontrol.teams=privateness"
+    - "com.privateness.service=entropy"
+    - "com.privateness.layer=security"
+    - "com.privateness.description=Cryptographic entropy - feeds /dev/random"
+    - "com.privateness.tier=1"
     depends_on:
       emercoin-core:
         condition: service_healthy
@@ -92,25 +92,25 @@ services:
     image: nessnetwork/privatenesstools:latest
     container_name: privatenesstools
     ports:
-      - "8888:8888"
+    - "8888:8888"
     restart: unless-stopped
     labels:
-      - "io.portainer.accesscontrol.teams=privateness"
-      - "com.privateness.service=tools"
-      - "com.privateness.layer=application"
-      - "com.privateness.tier=1"
+    - "io.portainer.accesscontrol.teams=privateness"
+    - "com.privateness.service=tools"
+    - "com.privateness.layer=application"
+    - "com.privateness.tier=1"
     depends_on:
-      - emercoin-core
-      - privateness
+    - emercoin-core
+    - privateness
 
 volumes:
   emercoin-data:
     labels:
-      - "com.privateness.volume=blockchain-data"
+    - "com.privateness.volume=blockchain-data"
 
 networks:
   default:
     name: ness-network-tier1
     driver: bridge
     labels:
-      - "com.privateness.network=tier1"
+    - "com.privateness.network=tier1"

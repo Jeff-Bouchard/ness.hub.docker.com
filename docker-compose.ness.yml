@@ -48,9 +48,10 @@ services:
     environment:
       - EMERCOIN_HOST=emercoin-core
       - EMERCOIN_PORT=6662
-      - EMERCOIN_USER=${EMERCOIN_RPC_USER:-rpcuser}
-      - EMERCOIN_PASS=${EMERCOIN_RPC_PASS:-rpcpassword}
+      - EMERCOIN_COOKIE_FILE=/data/.cookie
       - DNS_NVS_KEY=ness:dns-reverse-proxy-config
+    volumes:
+      - emercoin-data:/data:ro
     restart: unless-stopped
     depends_on:
       - emercoin-core

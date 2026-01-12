@@ -4,7 +4,7 @@
 Listens on port 50880 and exposes a single JSON endpoint:
   GET /status
 
-It runs the existing bash tests in ness-menu-v0.4.2.sh via the API mode:
+It runs the existing bash tests in ness-menu-v4.sh via the API mode:
   - test-dns-realities
   - test-full-node-e2e
 
@@ -30,7 +30,7 @@ import uuid
 from typing import Any, Dict
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-MENU_SCRIPT = os.path.join(BASE_DIR, "ness-menu-v0.4.2.sh")
+MENU_SCRIPT = os.path.join(BASE_DIR, "ness-menu-v4.sh")
 PORT = int(os.environ.get("NESS_STATUS_PORT", "50880"))
 
 
@@ -171,7 +171,7 @@ class StatusHandler(http.server.BaseHTTPRequestHandler):
 
 def main() -> None:
     if not os.path.isfile(MENU_SCRIPT):
-        print(f"ness-menu-v0.4.2.sh not found at {MENU_SCRIPT}", file=sys.stderr)
+        print(f"ness-menu-v4.sh not found at {MENU_SCRIPT}", file=sys.stderr)
         sys.exit(1)
 
     with socketserver.TCPServer(("0.0.0.0", PORT), StatusHandler) as httpd:

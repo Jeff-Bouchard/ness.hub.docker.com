@@ -3,9 +3,9 @@ services:
     image: nessnetwork/emercoin-core
     container_name: emercoin-core
     ports:
-      - "6661:6661"
-      - "6662:6662"
-      - "8775:8775"
+      - "${EMERCOIN_PORT_P2P:-6661}:6661"
+      - "${EMERCOIN_PORT_RPC:-6662}:6662"
+      
     volumes:
       - emercoin-data:/data
     restart: unless-stopped
@@ -21,7 +21,7 @@ services:
     image: nessnetwork/yggdrasil
     container_name: yggdrasil
     ports:
-      - "9001:9001"
+      - "${YGGDRASIL_PORT:-9001}:9001"
     volumes:
       - yggdrasil-data:/etc/yggdrasil
     restart: unless-stopped
@@ -35,10 +35,10 @@ services:
     image: nessnetwork/i2p-yggdrasil
     container_name: i2p-yggdrasil
     ports:
-      - "7657:7657"
-      - "4444:4444"
-      - "6668:6668"
-      - "9002:9002"
+      - "${I2P_CONSOLE_PORT:-7657}:7657"
+      - "${I2P_HTTP_PROXY:-4444}:4444"
+      - "${I2P_IRC_PORT:-6668}:6668"
+      - "${YGGDRASIL_ADMIN_PORT:-9002}:9002"
     volumes:
       - i2p-data:/var/lib/i2p
     restart: unless-stopped
@@ -56,7 +56,7 @@ services:
     image: nessnetwork/skywire
     container_name: skywire
     ports:
-      - "8000:8000"
+      - "${SKYWIRE_PORT:-8000}:8000"
     volumes:
       - skywire-data:/root/.skywire
     restart: unless-stopped
@@ -64,46 +64,12 @@ services:
       emercoin-core:
         condition: service_healthy
 
-  amneziawg:
-    image: nessnetwork/amneziawg
-    container_name: amneziawg
-    ports:
-      - "51820:51820/udp"
-    volumes:
-      - awg-config:/etc/amneziawg
-    restart: unless-stopped
-    cap_add:
-      - NET_ADMIN
-      - SYS_MODULE
-    devices:
-      - /dev/net/tun
-    sysctls:
-      - net.ipv4.ip_forward=1
-      - net.ipv6.conf.all.forwarding=1
-
-  skywire-amneziawg:
-    image: nessnetwork/skywire-amneziawg
-    container_name: skywire-amneziawg
-    ports:
-      - "8002:8000"
-      - "51821:51820/udp"
-    restart: unless-stopped
-    cap_add:
-      - NET_ADMIN
-      - SYS_MODULE
-    devices:
-      - /dev/net/tun
-    sysctls:
-      - net.ipv4.ip_forward=1
-    depends_on:
-      - emercoin-core
-
   privateness:
     image: nessnetwork/privateness
     container_name: privateness
     ports:
-      - "6006:6006"  # P2P
-      - "6660:6660"  # RPC
+      - "${PRIVATENESS_PORT_P2P:-6006}:6006"
+      - "${PRIVATENESS_PORT_RPC:-6660}:6660"
     environment:
       - RPC_ADDR=http://127.0.0.1:6660
       - COIN=privateness
@@ -118,8 +84,8 @@ services:
     image: nessnetwork/pyuheprng-privatenesstools
     container_name: pyuheprng-privatenesstools
     ports:
-      - "5000:5000"
-      - "8888:8888"
+      - "${PYUHEPRNG_PORT:-5000}:5000"
+      - "${PRIVATENESSTOOLS_PORT:-8888}:8888"
     restart: unless-stopped
     depends_on:
       emercoin-core:
@@ -131,59 +97,25 @@ services:
     image: nessnetwork/dns-reverse-proxy
     container_name: dns-reverse-proxy
     ports:
-      - "1053:53/udp"
-      - "1053:53/tcp"
-      - "8053:8053"
+      - "1053:${DNS_PORT_UDP:-53}/udp"
+      - "1053:${DNS_PORT_TCP:-53}/tcp"
+      - "${DNS_API_PORT:-8053}:8053"
     environment:
       - EMERCOIN_HOST=emercoin-core
-      - EMERCOIN_PORT=6662
-      - EMERCOIN_USER=${EMERCOIN_RPC_USER:-rpcuser}
-      - EMERCOIN_PASS=${EMERCOIN_RPC_PASS:-rpcpassword}
+      - EMERCOIN_PORT=${EMERCOIN_PORT_RPC:-6662}
+      - EMERCOIN_COOKIE_FILE=/data/.cookie
       - DNS_NVS_KEY=ness:dns-reverse-proxy-config
+    volumes:
+      - emercoin-data:/data:ro
     restart: unless-stopped
     depends_on:
       - emercoin-core
-
-  htcondor-cm:
-    image: nessnetwork/htcondor-cm
-    container_name: htcondor-cm
-    environment:
-      - CONDOR_HOST=htcondor-cm
-    volumes:
-      - htcondor-cm-data:/var/lib/condor
-    restart: unless-stopped
-
-  htcondor-submit:
-    image: nessnetwork/htcondor-submit
-    container_name: htcondor-submit
-    environment:
-      - CONDOR_HOST=htcondor-cm
-    volumes:
-      - htcondor-submit-data:/var/lib/condor
-    restart: unless-stopped
-    depends_on:
-      - htcondor-cm
-
-  htcondor-execute:
-    image: nessnetwork/htcondor-execute
-    container_name: htcondor-execute
-    environment:
-      - CONDOR_HOST=htcondor-cm
-    volumes:
-      - htcondor-execute-data:/var/lib/condor
-    restart: unless-stopped
-    depends_on:
-      - htcondor-cm
 
 volumes:
   emercoin-data:
   yggdrasil-data:
   i2p-data:
   skywire-data:
-  awg-config:
-  htcondor-cm-data:
-  htcondor-submit-data:
-  htcondor-execute-data:
 
 networks:
   default:

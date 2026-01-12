@@ -34,6 +34,9 @@ DEFAULT_IMAGES=(
   "pyuheprng-privatenesstools"
   "ipfs"
   "i2p-yggdrasil"
+  "htcondor-cm"
+  "htcondor-submit"
+  "htcondor-execute"
 )
 
 if [[ "${PI3_ONLY:-0}" != "0" ]]; then

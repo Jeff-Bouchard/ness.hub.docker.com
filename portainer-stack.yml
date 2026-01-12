@@ -8,37 +8,37 @@ services:
     image: nessnetwork/emercoin-core:latest
     container_name: emercoin-core
     ports:
-      - "6661:6661"
-      - "6662:6662"
-      - "8775:8775"
+    - "6661:6661"
+    - "6662:6662"
+    - "8775:8775"
     volumes:
-      - emercoin-data:/data
+    - emercoin-data:/data
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "emercoin-cli", "-datadir=/data", "getinfo"]
+      test: [ "CMD", "emercoin-cli", "-datadir=/data", "getinfo" ]
       interval: 30s
       timeout: 10s
       retries: 5
       start_period: 60s
     labels:
-      - "io.portainer.accesscontrol.teams=privateness"
-      - "com.privateness.service=blockchain"
-      - "com.privateness.layer=foundation"
+    - "io.portainer.accesscontrol.teams=privateness"
+    - "com.privateness.service=blockchain"
+    - "com.privateness.layer=foundation"
 
   yggdrasil:
     image: nessnetwork/yggdrasil:latest
     container_name: yggdrasil
     ports:
-      - "9001:9001"
+    - "9001:9001"
     volumes:
-      - yggdrasil-data:/etc/yggdrasil
+    - yggdrasil-data:/etc/yggdrasil
     restart: unless-stopped
     cap_add:
-      - NET_ADMIN
+    - NET_ADMIN
     labels:
-      - "io.portainer.accesscontrol.teams=privateness"
-      - "com.privateness.service=mesh-network"
-      - "com.privateness.layer=network"
+    - "io.portainer.accesscontrol.teams=privateness"
+    - "com.privateness.service=mesh-network"
+    - "com.privateness.layer=network"
     depends_on:
       emercoin-core:
         condition: service_healthy
@@ -47,193 +47,145 @@ services:
     image: nessnetwork/dns-reverse-proxy:latest
     container_name: dns-reverse-proxy
     ports:
-      - "53:53/udp"
-      - "53:53/tcp"
-      - "8053:8053"
+    - "53:53/udp"
+    - "53:53/tcp"
+    - "8053:8053"
     restart: unless-stopped
     labels:
-      - "io.portainer.accesscontrol.teams=privateness"
-      - "com.privateness.service=dns"
-      - "com.privateness.layer=application"
+    - "io.portainer.accesscontrol.teams=privateness"
+    - "com.privateness.service=dns"
+    - "com.privateness.layer=application"
     depends_on:
-      - emercoin-core
-      - yggdrasil
+    - emercoin-core
+    - yggdrasil
 
   i2p-yggdrasil:
     image: nessnetwork/i2p-yggdrasil:latest
     container_name: i2p-yggdrasil
     ports:
-      - "7657:7657"
-      - "4444:4444"
-      - "6668:6668"
-      - "9002:9002"
+    - "7657:7657"
+    - "4444:4444"
+    - "6668:6668"
+    - "9002:9002"
     volumes:
-      - i2p-data:/var/lib/i2p
+    - i2p-data:/var/lib/i2p
     restart: unless-stopped
     cap_add:
-      - NET_ADMIN
-      - SYS_MODULE
+    - NET_ADMIN
+    - SYS_MODULE
     devices:
-      - /dev/net/tun
+    - /dev/net/tun
     sysctls:
-      - net.ipv6.conf.all.forwarding=1
+    - net.ipv6.conf.all.forwarding=1
     labels:
-      - "io.portainer.accesscontrol.teams=privateness"
-      - "com.privateness.service=anonymity"
-      - "com.privateness.layer=network"
+    - "io.portainer.accesscontrol.teams=privateness"
+    - "com.privateness.service=anonymity"
+    - "com.privateness.layer=network"
     depends_on:
-      - yggdrasil
+    - yggdrasil
 
   skywire:
     image: nessnetwork/skywire:latest
     container_name: skywire
     ports:
-      - "8000:8000"
+    - "8000:8000"
     volumes:
-      - skywire-data:/root/.skywire
+    - skywire-data:/root/.skywire
     restart: unless-stopped
     labels:
-      - "io.portainer.accesscontrol.teams=privateness"
-      - "com.privateness.service=mesh-routing"
-      - "com.privateness.layer=transport"
+    - "io.portainer.accesscontrol.teams=privateness"
+    - "com.privateness.service=mesh-routing"
+    - "com.privateness.layer=transport"
     depends_on:
       emercoin-core:
         condition: service_healthy
-
-  amneziawg:
-    image: nessnetwork/amneziawg:latest
-    container_name: amneziawg
-    ports:
-      - "51820:51820/udp"
-    volumes:
-      - awg-config:/etc/amneziawg
-    restart: unless-stopped
-    cap_add:
-      - NET_ADMIN
-      - SYS_MODULE
-    devices:
-      - /dev/net/tun
-    sysctls:
-      - net.ipv4.ip_forward=1
-      - net.ipv6.conf.all.forwarding=1
-    labels:
-      - "io.portainer.accesscontrol.teams=privateness"
-      - "com.privateness.service=stealth-vpn"
-      - "com.privateness.layer=transport"
-
-  skywire-amneziawg:
-    image: nessnetwork/skywire-amneziawg:latest
-    container_name: skywire-amneziawg
-    ports:
-      - "8002:8000"
-      - "51821:51820/udp"
-    restart: unless-stopped
-    cap_add:
-      - NET_ADMIN
-      - SYS_MODULE
-    devices:
-      - /dev/net/tun
-    sysctls:
-      - net.ipv4.ip_forward=1
-      - net.ipv4.conf.all.forwarding=1
-    labels:
-      - "io.portainer.accesscontrol.teams=privateness"
-      - "com.privateness.service=access-layer"
-      - "com.privateness.layer=access"
-      - "com.privateness.description=AmneziaWG access → Skywire mesh"
-    depends_on:
-      - emercoin-core
 
   privateness:
     image: nessnetwork/privateness:latest
     container_name: privateness
     ports:
-      - "6006:6006"
-      - "6660:6660"
+    - "6006:6006"
+    - "6660:6660"
     restart: unless-stopped
     labels:
-      - "io.portainer.accesscontrol.teams=privateness"
-      - "com.privateness.service=core"
-      - "com.privateness.layer=application"
+    - "io.portainer.accesscontrol.teams=privateness"
+    - "com.privateness.service=core"
+    - "com.privateness.layer=application"
     depends_on:
-      - emercoin-core
-      - yggdrasil
-      - dns-reverse-proxy
+    - emercoin-core
+    - yggdrasil
+    - dns-reverse-proxy
 
   pyuheprng:
     image: nessnetwork/pyuheprng:latest
     container_name: pyuheprng
     privileged: true
     devices:
-      - /dev/random
+    - /dev/random
     volumes:
-      - /dev:/dev
+    - /dev:/dev
     ports:
-      - "5000:5000"
+    - "5000:5000"
     restart: unless-stopped
     environment:
-      - EMERCOIN_HOST=emercoin-core
-      - EMERCOIN_PORT=6662
-      - EMERCOIN_USER=${EMERCOIN_RPC_USER:-rpcuser}
-      - EMERCOIN_PASS=${EMERCOIN_RPC_PASS:-rpcpassword}
-      - MIN_ENTROPY_RATE=1000
-      - BLOCK_ON_LOW_ENTROPY=true
+    - EMERCOIN_HOST=emercoin-core
+    - EMERCOIN_PORT=6662
+    - EMERCOIN_COOKIE_FILE=/data/.cookie
+    - MIN_ENTROPY_RATE=1000
+    - BLOCK_ON_LOW_ENTROPY=true
     labels:
-      - "io.portainer.accesscontrol.teams=privateness"
-      - "com.privateness.service=entropy"
-      - "com.privateness.layer=security"
-      - "com.privateness.description=Cryptographic entropy - feeds /dev/random"
+    - "io.portainer.accesscontrol.teams=privateness"
+    - "com.privateness.service=entropy"
+    - "com.privateness.layer=security"
+    - "com.privateness.description=Cryptographic entropy - feeds /dev/random"
     depends_on:
-      - emercoin-core:
-        condition: service_healthy
+    - emercoin-core:
+      condition: service_healthy
 
   privatenumer:
     image: nessnetwork/privatenumer:latest
     container_name: privatenumer
     ports:
-      - "3000:3000"
+    - "3000:3000"
     restart: unless-stopped
     labels:
-      - "io.portainer.accesscontrol.teams=privateness"
-      - "com.privateness.service=number-generation"
-      - "com.privateness.layer=application"
+    - "io.portainer.accesscontrol.teams=privateness"
+    - "com.privateness.service=number-generation"
+    - "com.privateness.layer=application"
     depends_on:
-      - pyuheprng
+    - pyuheprng
 
   privatenesstools:
     image: nessnetwork/privatenesstools:latest
     container_name: privatenesstools
     ports:
-      - "8888:8888"
+    - "8888:8888"
     restart: unless-stopped
     labels:
-      - "io.portainer.accesscontrol.teams=privateness"
-      - "com.privateness.service=tools"
-      - "com.privateness.layer=application"
+    - "io.portainer.accesscontrol.teams=privateness"
+    - "com.privateness.service=tools"
+    - "com.privateness.layer=application"
     depends_on:
-      - privateness
-      - emercoin-core
+    - privateness
+    - emercoin-core
 
 volumes:
   emercoin-data:
     labels:
-      - "com.privateness.volume=blockchain-data"
+    - "com.privateness.volume=blockchain-data"
   yggdrasil-data:
     labels:
-      - "com.privateness.volume=mesh-config"
+    - "com.privateness.volume=mesh-config"
   i2p-data:
     labels:
-      - "com.privateness.volume=anonymity-data"
+    - "com.privateness.volume=anonymity-data"
   skywire-data:
     labels:
-      - "com.privateness.volume=mesh-data"
-  awg-config:
-    labels:
-      - "com.privateness.volume=vpn-config"
+    - "com.privateness.volume=mesh-data"
 
 networks:
   default:
     name: ness-network
     driver: bridge
     labels:
-      - "com.privateness.network=main"
+    - "com.privateness.network=main"
