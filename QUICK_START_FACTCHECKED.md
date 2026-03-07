@@ -112,8 +112,8 @@ Includes all of Essential, plus:
 - `skywire` — Skycoin mesh visor (label-based MPLS-style routing)
   - Port 8000/TCP: Visor management UI
   - **Fact**: Uses Skycoin 100% uptime incentive model; not a secondary network
-- `amneziawg` — AmneziaWG stealth VPN (WireGuard with obfuscation)
-  - Port 51820/UDP: VPN endpoint
+- `softether` — SoftEther stealth VPN (WireGuard with obfuscation)
+  - Port 443/UDP: VPN endpoint
 
 ```bash
 docker compose -f docker-compose.yml up -d
@@ -236,7 +236,7 @@ docker run --rm -v emercoin-data:/data -v $(pwd):/backup \
 | i2p-yggdrasil | 7657 | 7657 | TCP | I2P web console (router/tunnels) |
 | i2p-yggdrasil | 4444 | 4444 | TCP | I2P HTTP proxy |
 | skywire | 8000 | 8000 | TCP | Skywire visor management UI |
-| amneziawg | 51820 | 51820 | UDP | AmneziaWG VPN endpoint |
+| softether | 443 | 443 | UDP | SoftEther VPN endpoint |
 
 **Customize ports** in `.env`:
 ```bash

@@ -112,8 +112,8 @@ Inclut tous les éléments de Essentiel, plus:
 - `skywire` — Viseur maille Skycoin (routage MPLS basé sur étiquettes)
   - Port 8000/TCP: Interface utilisateur de gestion du viseur
   - **Fait**: Utilise le modèle d'incitation de disponibilité 100% de Skycoin
-- `amneziawg` — VPN caché AmneziaWG (WireGuard avec obfuscation)
-  - Port 51820/UDP: Point de terminaison VPN
+- `amneziawg` — VPN caché SoftEther (WireGuard avec obfuscation)
+  - Port 443/UDP: Point de terminaison VPN
 
 ```bash
 docker compose -f docker-compose.yml up -d
@@ -236,7 +236,7 @@ docker run --rm -v emercoin-data:/data -v $(pwd):/backup \
 | i2p-yggdrasil | 7657 | 7657 | TCP | Console Web I2P (routeur/tunnels) |
 | i2p-yggdrasil | 4444 | 4444 | TCP | Proxy HTTP I2P |
 | skywire | 8000 | 8000 | TCP | Interface utilisateur de gestion du viseur Skywire |
-| amneziawg | 51820 | 51820 | UDP | Point de terminaison VPN AmneziaWG |
+| amneziawg | 443 | 443 | UDP | Point de terminaison VPN SoftEther |
 
 **Personnaliser les ports** dans `.env`:
 ```bash

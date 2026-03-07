@@ -129,7 +129,7 @@ docker compose -f docker-compose.yml up -d
   - 💰 Uses Skycoin 100% uptime incentive model
 
 - 🔓 **amneziawg** — Stealth VPN with obfuscation
-  - `51820/UDP` → VPN endpoint
+  - `443/UDP` → VPN endpoint
   - 👻 WireGuard with DPI bypass
 
 ---
@@ -244,7 +244,7 @@ docker run --rm -v emercoin-data:/data -v $(pwd):/backup \
 | 👁️ i2p | `7657` | TCP | Web console |
 | 👁️ i2p | `4444` | TCP | HTTP proxy |
 | 🕸️ skywire | `8000` | TCP | Visor UI |
-| 🔓 amneziawg | `51820` | UDP | VPN |
+| 🔓 amneziawg | `443` | UDP | VPN |
 
 **Customize in `.env`:**
 ```bash
