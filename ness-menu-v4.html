@@ -471,12 +471,12 @@
       <div class="control-grid" style="margin-top: 26px;">
         <div class="card stack">
           <h3>API Endpoint</h3>
-          <small>Point this UI at the Ness automation endpoint that proxies CLI actions.</small>
+          <small>Point this UI at the Ness automation endpoint that proxies CLI actions. Leave empty for local simulation mode.</small>
           <div class="api-row">
-            <input type="url" id="apiBase" placeholder="https://node.example.org/api/menu" />
+            <input type="url" id="apiBase" placeholder="http://localhost:8080/api/menu or https://node.example.org/api/menu" />
             <button type="button" class="button-secondary" id="saveEndpoint">Set</button>
           </div>
-          <small id="endpointStatus" class="log-info">No endpoint configured. Actions will stay local.</small>
+          <small id="endpointStatus" class="log-info">No endpoint configured. Actions will stay local (simulation mode).</small>
           <div class="stack" style="margin-top: 16px;">
             <label>
               <span>Deployment profile</span>

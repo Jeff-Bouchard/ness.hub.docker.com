@@ -1,0 +1,26 @@
+{
+	"folders": [
+		{
+			"path": "../../../../../../../../mnt/sda4/softethervpn"
+		},
+		{
+			"path": "."
+		},
+		{
+			"path": "../softether"
+		},
+		{
+			"path": "../../../../../../../../mnt/sda4/pyuheprng"
+		},
+		{
+			"path": "../EIP4361-main"
+		},
+		{
+			"path": "../blockchain_dns_system"
+		},
+		{
+			"path": "../../../../../../../../mnt/sda4/Condor_GUI_v093"
+		}
+	],
+	"settings": {}
+}

@@ -1,16 +1,15 @@
 #!/bin/bash
 
 # Portainer Stack Deployment Script
-# Automates deployment via Portainer API
+# Automates Portainer CE lifecycle via docker compose
 
-set -e
+set -euo pipefail
 
 # Configuration
-PORTAINER_URL="${PORTAINER_URL:-http://localhost:9000}"
-PORTAINER_API_KEY="${PORTAINER_API_KEY}"
-STACK_NAME="${STACK_NAME:-privateness-network}"
-STACK_FILE="${STACK_FILE:-portainer-stack.yml}"
-ENDPOINT_ID="${ENDPOINT_ID:-1}"
+COMPOSE_FILE="${COMPOSE_FILE:-portainer-compose.yaml}"
+PROJECT_NAME="${PROJECT_NAME:-portainer}"
+PORTAINER_PORT="${PORTAINER_PORT:-55443}"
+ACTION=""
 
 # Colors
 RED='\033[0;31m'
@@ -21,135 +20,53 @@ NC='\033[0m'
 echo -e "${GREEN}Privateness Network - Portainer Deployment${NC}"
 echo "=============================================="
 
-# Check prerequisites
-if [ -z "$PORTAINER_API_KEY" ]; then
-    echo -e "${RED}Error: PORTAINER_API_KEY not set${NC}"
-    echo "Get your API key from Portainer: User → My account → API tokens"
+if [ ! -f "$COMPOSE_FILE" ]; then
+    echo -e "${RED}Error: Compose file not found: $COMPOSE_FILE${NC}"
     exit 1
 fi
 
-if [ ! -f "$STACK_FILE" ]; then
-    echo -e "${RED}Error: Stack file not found: $STACK_FILE${NC}"
-    exit 1
-fi
-
-echo -e "${YELLOW}Checking Portainer connection...${NC}"
-if ! curl -s -f -H "X-API-Key: $PORTAINER_API_KEY" "$PORTAINER_URL/api/status" > /dev/null; then
-    echo -e "${RED}Error: Cannot connect to Portainer at $PORTAINER_URL${NC}"
-    exit 1
-fi
-echo -e "${GREEN}✓ Connected to Portainer${NC}"
-
-# Check if stack exists
-STACK_ID=$(curl -s -H "X-API-Key: $PORTAINER_API_KEY" \
-    "$PORTAINER_URL/api/stacks" | \
-    jq -r ".[] | select(.Name==\"$STACK_NAME\") | .Id")
-
-if [ -n "$STACK_ID" ]; then
-    echo -e "${YELLOW}Stack '$STACK_NAME' already exists (ID: $STACK_ID)${NC}"
-    read -p "Update existing stack? (y/n) " -n 1 -r
-    echo
-    if [[ $REPLY =~ ^[Yy]$ ]]; then
-        echo -e "${YELLOW}Updating stack...${NC}"
-        
-        RESPONSE=$(curl -s -X PUT \
-            -H "X-API-Key: $PORTAINER_API_KEY" \
-            -H "Content-Type: application/json" \
-            -d "{
-                \"StackFileContent\": $(jq -Rs . < "$STACK_FILE"),
-                \"Env\": [],
-                \"Prune\": false,
-                \"PullImage\": true
-            }" \
-            "$PORTAINER_URL/api/stacks/$STACK_ID?endpointId=$ENDPOINT_ID")
-        
-        if echo "$RESPONSE" | jq -e '.Id' > /dev/null 2>&1; then
-            echo -e "${GREEN}✓ Stack updated successfully${NC}"
-        else
-            echo -e "${RED}Error updating stack:${NC}"
-            echo "$RESPONSE" | jq .
-            exit 1
-        fi
-    else
-        echo "Deployment cancelled"
-        exit 0
-    fi
+INTERACTIVE=0
+if [ "$#" -eq 0 ]; then
+    INTERACTIVE=1
 else
-    echo -e "${YELLOW}Creating new stack '$STACK_NAME'...${NC}"
-    
-    RESPONSE=$(curl -s -X POST \
-        -H "X-API-Key: $PORTAINER_API_KEY" \
-        -H "Content-Type: application/json" \
-        -d "{
-            \"Name\": \"$STACK_NAME\",
-            \"StackFileContent\": $(jq -Rs . < "$STACK_FILE"),
-            \"Env\": [],
-            \"FromAppTemplate\": false
-        }" \
-        "$PORTAINER_URL/api/stacks?type=2&method=string&endpointId=$ENDPOINT_ID")
-    
-    if echo "$RESPONSE" | jq -e '.Id' > /dev/null 2>&1; then
-        STACK_ID=$(echo "$RESPONSE" | jq -r '.Id')
-        echo -e "${GREEN}✓ Stack created successfully (ID: $STACK_ID)${NC}"
-    else
-        echo -e "${RED}Error creating stack:${NC}"
-        echo "$RESPONSE" | jq .
-        exit 1
-    fi
+    ACTION="$1"
 fi
 
-# Wait for deployment
-echo -e "${YELLOW}Waiting for services to start...${NC}"
-sleep 5
+run_compose() {
+    local timeout_cmd=()
+    local seconds="${TIMEOUT_SECONDS:-300}"
+    if command -v timeout >/dev/null 2>&1; then
+        timeout_cmd=(timeout "$seconds")
+    fi
+    "${timeout_cmd[@]}" docker compose -f "$COMPOSE_FILE" -p "$PROJECT_NAME" "$@"
+}
 
-# Check stack status
-STACK_STATUS=$(curl -s -H "X-API-Key: $PORTAINER_API_KEY" \
-    "$PORTAINER_URL/api/stacks/$STACK_ID" | jq -r '.Status')
-
-echo ""
-echo -e "${GREEN}Deployment Summary${NC}"
-echo "==================="
-echo "Stack Name: $STACK_NAME"
-echo "Stack ID: $STACK_ID"
-echo "Status: $STACK_STATUS"
-echo ""
-echo -e "${GREEN}Access Points:${NC}"
-echo "  Emercoin RPC: http://localhost:6662"
-echo "  I2P Console: http://localhost:7657"
-echo "  Privateness: http://localhost:8080"
-echo "  Portainer: $PORTAINER_URL"
-echo ""
-echo -e "${GREEN}✓ Deployment complete!${NC}"
-
-# Optional: show QR code for quick access to Portainer
-HOST_IP=${HOST_IP:-}
-if [ -z "$HOST_IP" ]; then
-  # try to detect a likely LAN IP (non-loopback)
-  if command -v hostname >/dev/null 2>&1; then
-    HOST_IP=$(hostname -I 2>/dev/null | awk '{for(i=1;i<=NF;i++) if ($i!~/^127\./) {print $i; exit}}')
+show_qr() {
+  # Optional: show QR code for quick access to Portainer
+  HOST_IP=${HOST_IP:-}
+  if [ -z "$HOST_IP" ]; then
+    # try to detect a likely LAN IP (non-loopback)
+    if command -v hostname >/dev/null 2>&1; then
+      HOST_IP=$(hostname -I 2>/dev/null | awk '{for(i=1;i<=NF;i++) if ($i!~/^127\./) {print $i; exit}}')
+    fi
   fi
-fi
 
-ACCESS_URL="$PORTAINER_URL"
-if [ -n "$HOST_IP" ]; then
-  # If user left default http://localhost:9000, also print a LAN-friendly URL
-  case "$PORTAINER_URL" in
-    http://localhost:9000) ACCESS_URL="http://$HOST_IP:9000" ;;
-    https://localhost:9443) ACCESS_URL="https://$HOST_IP:9443" ;;
-  esac
-fi
+  ACCESS_URL="https://localhost:$PORTAINER_PORT"
+  if [ -n "$HOST_IP" ]; then
+    ACCESS_URL="https://$HOST_IP:$PORTAINER_PORT"
+  fi
 
-echo ""
-echo -e "${YELLOW}Quick Access URL:${NC} $ACCESS_URL"
+  echo ""
+  echo -e "${YELLOW}Quick Access URL:${NC} $ACCESS_URL"
 
-if command -v qrencode >/dev/null 2>&1; then
-  echo -e "${YELLOW}QR code (scan to open Portainer):${NC}"
-  qrencode -t ANSIUTF8 "$ACCESS_URL"
-else
-  # Fallback to Python-based QR if available
-  if command -v python3 >/dev/null 2>&1; then
-    PY_TMP=$(mktemp)
-    cat > "$PY_TMP" <<'PY'
+  if command -v qrencode >/dev/null 2>&1; then
+    echo -e "${YELLOW}QR code (scan to open Portainer):${NC}"
+    qrencode -t ANSIUTF8 "$ACCESS_URL"
+  else
+    # Fallback to Python-based QR if available
+    if command -v python3 >/dev/null 2>&1; then
+      PY_TMP=$(mktemp)
+      cat > "$PY_TMP" <<'PY'
 import sys
 try:
     import qrcode
@@ -167,17 +84,88 @@ try:
 except Exception:
     img.show()
 PY
-    if python3 - <<PYCHK
+      if python3 - <<PYCHK
 import importlib, sys
 sys.exit(0 if importlib.util.find_spec('qrcode') else 1)
 PYCHK
-    then
-      python3 "$PY_TMP" "$ACCESS_URL"
+      then
+        python3 "$PY_TMP" "$ACCESS_URL"
+      else
+        echo -e "${YELLOW}(Tip) Install a QR tool for terminal output: 'sudo apt-get install -y qrencode' or 'pip install qrcode[pil]'${NC}"
+      fi
+      rm -f "$PY_TMP" 2>/dev/null || true
     else
-      echo -e "${YELLOW}(Tip) Install a QR tool for terminal output: 'sudo apt-get install -y qrencode' or 'pip install qrcode[pil]'${NC}"
+      echo -e "${YELLOW}(Tip) Install a QR tool for terminal output: 'sudo apt-get install -y qrencode'${NC}"
     fi
-    rm -f "$PY_TMP" 2>/dev/null || true
-  else
-    echo -e "${YELLOW}(Tip) Install a QR tool for terminal output: 'sudo apt-get install -y qrencode'${NC}"
   fi
+}
+
+do_action() {
+  local action="$1"
+  case "$action" in
+    start)
+        echo -e "${YELLOW}Starting Portainer stack...${NC}"
+        run_compose up -d
+        show_qr
+        ;;
+    stop)
+        echo -e "${YELLOW}Stopping Portainer stack...${NC}"
+        run_compose stop
+        ;;
+    status)
+        echo -e "${YELLOW}Portainer stack status:${NC}"
+        run_compose ps
+        ;;
+    clean-restart)
+        echo -e "${YELLOW}Performing clean restart (down + up) of Portainer stack...${NC}"
+        run_compose down
+        run_compose up -d
+        show_qr
+        ;;
+    *)
+        echo "Invalid action: $action"
+        echo "Usage: $0 {start|stop|status|clean-restart}"
+        return 1
+        ;;
+  esac
+}
+
+show_menu() {
+  while true; do
+    echo ""
+    echo "[ Portainer CE Menu ]"
+    echo "  1) Start"
+    echo "  2) Stop"
+    echo "  3) Status"
+    echo "  4) Clean restart"
+    echo "  q) Quit"
+    echo ""
+    read -r -p "Select an option: " choice
+
+    case "$choice" in
+      1) do_action start ;;
+      2) do_action stop ;;
+      3) do_action status ;;
+      4) do_action clean-restart ;;
+      q|Q)
+         echo "Exiting menu."
+         break
+         ;;
+      *)
+         echo -e "${RED}Invalid selection. Please choose 1, 2, 3, 4 or q.${NC}"
+         ;;
+    esac
+
+    # Pause after each action so output is visible
+    echo ""
+    read -r -p "Press Enter to continue..." _dummy
+  done
+}
+
+if [ "$INTERACTIVE" -eq 1 ]; then
+  show_menu
+  exit 0
 fi
+
+do_action "$ACTION"
+

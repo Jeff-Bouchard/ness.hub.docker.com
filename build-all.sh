@@ -34,10 +34,9 @@ DEFAULT_IMAGES=(
   "pyuheprng-privatenesstools"
   "ipfs"
   "i2p-yggdrasil"
-  "amneziawg"
-  "skywire-amneziawg"
-  "amnezia-exit"
-  "ness-unified"
+  "htcondor-cm"
+  "htcondor-submit"
+  "htcondor-execute"
 )
 
 if [[ "${PI3_ONLY:-0}" != "0" ]]; then

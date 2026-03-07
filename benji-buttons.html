@@ -5,14 +5,38 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Benji Buttons</title>
   <style>
+<<<<<<< HEAD
     body { background: #0f1011; color: #e4e4e4; font-family: 'Fira Sans', Arial, sans-serif; margin: 0; }
     .container { max-width: 700px; margin: 40px auto; background: #161616; border-radius: 12px; box-shadow: 0 0 22px rgba(0,0,0,0.85); padding: 2em 2.5em; text-align: center; }
     h1 { color: #f2f2f2; margin-bottom: 0.2em; }
     p.subtitle { color: #b0b0b0; margin-top: 0; margin-bottom: 2em; }
+=======
+    body {
+      background:
+        radial-gradient(circle at 20% -10%, #1c2b45 0, transparent 55%),
+        radial-gradient(circle at 80% -20%, #301b4a 0, transparent 60%),
+        #050712;
+      color: #e4f0ff;
+      font-family: 'Fira Sans', Arial, sans-serif;
+      margin: 0;
+    }
+    .container {
+      max-width: 700px;
+      margin: 40px auto;
+      background: rgba(5, 10, 24, 0.96);
+      border-radius: 12px;
+      box-shadow: 0 0 0 1px #141c2d, 0 24px 60px rgba(0, 0, 0, 0.9);
+      padding: 2em 2.5em;
+      text-align: center;
+    }
+    h1 { color: #7fd4ff; margin-bottom: 0.2em; letter-spacing: 0.03em; }
+    p.subtitle { color: #9fb4e0; margin-top: 0; margin-bottom: 2em; }
+>>>>>>> 753c9b1 (cleanup)
     .buttons { display: flex; flex-direction: column; gap: 1em; }
     .btn {
       display: inline-block;
       padding: 0.9em 1.4em;
+<<<<<<< HEAD
       border-radius: 6px;
       border: 1px solid #3a3a3a;
       font-size: 1.05em;
@@ -37,6 +61,40 @@
     .btn.secondary { background: linear-gradient(135deg, #ffb74d, #ff9800); color: #101c2a; }
     .btn.tertiary { background: linear-gradient(135deg, #ab47bc, #8e24aa); color: #f8f5ff; }
     .footer { margin-top: 2em; text-align: center; color: #6ec6ff; font-size: 0.95em; }
+=======
+      border-radius: 999px;
+      border: none;
+      font-size: 1.1em;
+      font-weight: 600;
+      cursor: pointer;
+      background: linear-gradient(135deg, #46e6ff, #007bff);
+      color: #02040b;
+      text-decoration: none;
+      transition: transform 0.08s ease-out, box-shadow 0.08s ease-out, background 0.2s ease-in-out, filter 0.2s ease-in-out;
+      box-shadow: 0 0 0 1px #1a3450, 0 0 22px rgba(34, 173, 255, 0.45);
+    }
+    .btn:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 0 34px rgba(48, 198, 255, 0.7);
+      filter: brightness(1.1);
+    }
+    .btn:active {
+      transform: translateY(0);
+      box-shadow: 0 0 18px rgba(16, 140, 220, 0.6);
+      background: linear-gradient(135deg, #1fb6ff, #0062ff);
+    }
+    .btn.secondary {
+      background: linear-gradient(135deg, #ffcf6b, #ff8f00);
+      color: #140a02;
+      box-shadow: 0 0 0 1px #55391a, 0 0 22px rgba(255, 191, 71, 0.43);
+    }
+    .btn.tertiary {
+      background: linear-gradient(135deg, #f062ff, #a023ff);
+      color: #fdf7ff;
+      box-shadow: 0 0 0 1px #45205f, 0 0 24px rgba(227, 129, 255, 0.55);
+    }
+    .footer { margin-top: 2em; text-align: center; color: #6aaaff; font-size: 0.95em; opacity: 0.8; }
+>>>>>>> 753c9b1 (cleanup)
     .result-wrapper {
 >>>>>>> a8afaec68475909d134d29a27cccd7d69ac140e2
       margin-top: 2em;
@@ -44,7 +102,11 @@
     }
     .result {
       text-align: left;
+<<<<<<< HEAD
       background: #111111;
+=======
+      background: #050915;
+>>>>>>> 753c9b1 (cleanup)
       border-radius: 8px;
       border: 1px solid #2a2a2a;
       padding: 0.75em 0.9em;
@@ -72,6 +134,7 @@
       overflow: auto;
       white-space: pre-wrap;
       word-break: break-word;
+      box-shadow: 0 0 0 1px #141d32, 0 18px 40px rgba(0, 0, 0, 0.85);
     }
 <<<<<<< HEAD
     .result-action {
@@ -152,11 +215,11 @@
         <button id="btn-open-result" class="result-action">Open as file</button>
 =======
     <h1>Privateness Persona</h1>
-    <p class="subtitle">Fetch EmerNVS records via emerapi.info GraphQL: ness:wallet, ness:hub and ness:id.</p>
+    <p class="subtitle">Fetch EmerNVS records via emerapi.info GraphQL: ness:wallet, ness:id and ness:hub.</p>
     <div class="buttons">
       <button id="benji-wallet" class="btn">Quickstart &mdash; Wallet (ness:wallet)</button>
-      <button id="benji-hub" class="btn secondary">Containers &mdash; Hub (ness:hub)</button>
-      <button id="benji-id" class="btn tertiary">Bedrock Identity Creation Wizard HTML code&mdash; ID (ness:id)</button>
+      <button id="benji-id" class="btn secondary">Bedrock Identity Creation Wizard HTML code&mdash; ID (ness:id)</button>
+      <button id="benji-hub" class="btn tertiary">Containers &mdash; Hub (ness:hub)</button>
     </div>
     <div id="benji-result-wrapper" class="result-wrapper" style="display:none;">
       <button id="benji-copy" class="copy-btn">COPY</button>
@@ -439,11 +502,14 @@
     }
 
     wireBenji('benji-wallet', 'ness:wallet', 'EmerNVS Wallet');
-    wireBenji('benji-hub', 'ness:hub', 'EmerNVS Hub');
     wireBenji('benji-id', 'ness:id', 'EmerNVS ID');
+<<<<<<< HEAD
 <<<<<<< HEAD
     setupResultControls();
 =======
+=======
+    wireBenji('benji-hub', 'ness:hub', 'EmerNVS Hub');
+>>>>>>> 753c9b1 (cleanup)
     setupCopy();
     setupResultActions();
 >>>>>>> a8afaec68475909d134d29a27cccd7d69ac140e2

@@ -571,6 +571,9 @@ services_menu() {
     echo "  7) I2P-Yggdrasil"
     echo "  8) AmneziaWG"
     echo "  9) Skywire-AmneziaWG"
+    echo " 10) HTCondor central manager"
+    echo " 11) HTCondor submit node"
+    echo " 12) HTCondor execute node"
     echo "  0) Back"
     echo
     read -rp "Select service: " choice
@@ -584,6 +587,9 @@ services_menu() {
       7) service_control_menu "i2p-yggdrasil" "I2P-Yggdrasil" ;;
       8) service_control_menu "amneziawg" "AmneziaWG" ;;
       9) service_control_menu "skywire-amneziawg" "Skywire-AmneziaWG" ;;
+      10) service_control_menu "htcondor-cm" "HTCondor central manager" ;;
+      11) service_control_menu "htcondor-submit" "HTCondor submit node" ;;
+      12) service_control_menu "htcondor-execute" "HTCondor execute node" ;;
       0) return 0 ;;
       *) echo "Invalid choice." ;;
     esac
@@ -677,6 +683,69 @@ test_dns_reverse_proxy() {
   echo -e "${yellow}Testing dns-reverse-proxy listener (ports ${DNS_PROXY_HOST_PORT} and 8053)...${reset}"
   check_tcp_port 127.0.0.1 "${DNS_PROXY_HOST_PORT}" "dns-reverse-proxy (DNS)" || true
   check_tcp_port 127.0.0.1 8053 "dns-reverse-proxy (control/API)" || true
+}
+
+test_dns_realities() {
+  echo
+  echo -e "${yellow}Testing DNS realities vs canonical clearnet domains (ness.cx, privateness.link)...${reset}"
+
+  require_docker || return 1
+
+  if ! docker ps --format '{{.Names}}' | grep -q '^dns-reverse-proxy$'; then
+    echo -e " ${red}${check_fail_symbol}${reset} dns-reverse-proxy container not running"
+    return 1
+  fi
+
+  if ! command -v dig >/dev/null 2>&1; then
+    echo -e " ${red}${check_fail_symbol}${reset} dig(1) not available on host; DNS realities test requires an external observer with dig installed."
+    return 1
+  fi
+
+  local name1="ness.cx" name2="privateness.link"
+  local ans1 ans2 rc1 rc2
+  rc1=1
+  rc2=1
+
+  # Run dig from the host only, treating the host as an external observer of the dockerised DNS stack.
+  ans1=$(dig +time=3 +tries=1 @"127.0.0.1" -p "${DNS_PROXY_HOST_PORT}" "${name1}" A +short 2>/dev/null || true)
+  if [ -n "$ans1" ]; then
+    rc1=0
+  fi
+
+  ans2=$(dig +time=3 +tries=1 @"127.0.0.1" -p "${DNS_PROXY_HOST_PORT}" "${name2}" A +short 2>/dev/null || true)
+  if [ -n "$ans2" ]; then
+    rc2=0
+  fi
+
+  echo "  ${name1}  ${ans1:-'(no answer)'}"
+  echo "  ${name2}  ${ans2:-'(no answer)'}"
+
+  local rc=0
+
+  case "$DNS_MODE" in
+    icann|hybrid)
+      if [ "$rc1" -eq 0 ] || [ "$rc2" -eq 0 ]; then
+        echo -e " ${green}${check_ok_symbol}${reset} CLEARNET reality (${DNS_MODE}): at least one canonical domain resolves via dns-reverse-proxy"
+      else
+        echo -e " ${red}${check_fail_symbol}${reset} CLEARNET reality (${DNS_MODE}): neither ness.cx nor privateness.link resolved"
+        rc=1
+      fi
+      ;;
+    emerdns)
+      if [ "$rc1" -eq 0 ] || [ "$rc2" -eq 0 ]; then
+        echo -e " ${red}${check_fail_symbol}${reset} NON-clearnet reality (EmerDNS-only): canonical clearnet domains unexpectedly resolved"
+        rc=1
+      else
+        echo -e " ${green}${check_ok_symbol}${reset} NON-clearnet reality (EmerDNS-only): ness.cx and privateness.link not resolvable as expected"
+      fi
+      ;;
+    *)
+      echo -e " ${yellow}${check_fail_symbol}${reset} Unknown DNS_MODE='${DNS_MODE}'  cannot evaluate DNS reality invariants"
+      rc=1
+      ;;
+  esac
+
+  return "$rc"
 }
 
 test_skywire() {
@@ -1115,7 +1184,7 @@ test_full_node_e2e() {
   echo -e "${yellow}Full node end-to-end (AuxPoW-anchored core + overlays/VPN)...${reset}"
   require_docker || return 1
 
-  local rc_health rc_overlays
+  local rc_health rc_overlays rc_dns
 
   health_check
   rc_health=$?
@@ -1123,14 +1192,67 @@ test_full_node_e2e() {
   test_full_node_overlays
   rc_overlays=$?
 
+  test_dns_realities
+  rc_dns=$?
+
   echo
-  if [ "$rc_health" -eq 0 ] && [ "$rc_overlays" -eq 0 ]; then
+  if [ "$rc_health" -eq 0 ] && [ "$rc_overlays" -eq 0 ] && [ "$rc_dns" -eq 0 ]; then
     echo -e "${green}[  OK  ] FULL NODE E2E: AuxPoW-anchored core, DNS, entropy, overlays/VPN${reset}"
     return 0
   else
     echo -e "${red}[ FAIL ] FULL NODE E2E: see above sections for details${reset}"
     return 1
   fi
+}
+
+test_htcondor_pool() {
+  echo
+  echo -e "${yellow}Testing HTCondor pool (central manager + submit + execute)...${reset}"
+  require_docker || return 1
+
+  local rc=0
+
+  local cm_status submit_status exec_status
+  cm_status=$(service_status "htcondor-cm")
+  submit_status=$(service_status "htcondor-submit")
+  exec_status=$(service_status "htcondor-execute")
+
+  echo
+  echo "-- HTCondor services (docker compose) --"
+  printf "  %-22s : %s\n" "cm" "$cm_status"
+  printf "  %-22s : %s\n" "submit" "$submit_status"
+  printf "  %-22s : %s\n" "execute" "$exec_status"
+
+  if [ "$cm_status" != "RUNNING" ] || [ "$submit_status" != "RUNNING" ] || [ "$exec_status" != "RUNNING" ]; then
+    echo -e " ${red}${check_fail_symbol}${reset} HTCondor containers are not all RUNNING (see statuses above)."
+    rc=1
+  fi
+
+  if [ "$rc" -eq 0 ]; then
+    echo
+    echo "-- condor_status from htcondor-submit --"
+    local status_out status_rc
+    status_rc=0
+    status_out=$(MSYS_NO_PATHCONV=1 docker exec htcondor-submit condor_status 2>&1) || status_rc=$?
+    if [ "$status_rc" -eq 0 ] && [ -n "${status_out}" ]; then
+      echo "$status_out" | head -c 400; echo
+      echo -e " ${green}${check_ok_symbol}${reset} condor_status succeeded from htcondor-submit"
+    else
+      echo "$status_out" | head -c 400; echo
+      echo -e " ${red}${check_fail_symbol}${reset} condor_status failed from htcondor-submit"
+      rc=1
+    fi
+  fi
+
+  if [ "$rc" -eq 0 ]; then
+    echo
+    echo -e "${green}===== HTCondor POOL STATUS: OK (cm + submit + execute reachable) =====${reset}"
+  else
+    echo
+    echo -e "${red}===== HTCondor POOL STATUS: ISSUES DETECTED =====${reset}"
+  fi
+
+  return "$rc"
 }
 
 test_menu() {
@@ -1144,6 +1266,9 @@ test_menu() {
     echo "  5) Test Skywire visor (port 8000)"
     echo "  6) Full node overlay/VPN services"
     echo "  7) Full node E2E (tier 1 + overlays/VPN)"
+    echo "  8) HTCondor pool (cm/submit/execute)"
+    echo "  9) DNS realities / clearnet invariants (ness.cx / privateness.link)"
+    echo " 10) Flush host DNS caches (best-effort)"
     echo "  0) Back"
     echo
     read -rp "Select an option: " choice
@@ -1155,6 +1280,9 @@ test_menu() {
       5) test_skywire ;;
       6) test_full_node_overlays ;;
       7) test_full_node_e2e ;;
+      8) test_htcondor_pool ;;
+      9) test_dns_realities ;;
+      10) flush_dns_caches ;;
       0) return 0 ;;
       *) echo "Invalid choice." ;;
     esac
@@ -1228,15 +1356,22 @@ api_dispatch() {
       test_full_node_e2e ;;
     test-dns-reverse-proxy)
       test_dns_reverse_proxy ;;
+    test-dns-realities)
+      test_dns_realities ;;
     test-pyuheprng)
       test_pyuheprng ;;
     test-skywire)
       test_skywire ;;
+    test-htcondor-pool)
+      test_htcondor_pool ;;
     nuke-local)
       remove_everything_local ;;
     set-dns-mode)
+      flush_dns_caches
       echo "DNS mode set to: ${DNS_MODE} (${DNS_DESC})"
-      echo "System-wide resolver update and DNS cache flush should be handled by the host environment." ;;
+      echo "Host DNS caches flushed (best-effort)." ;;
+    flush-dns-caches)
+      flush_dns_caches ;;
     sync-labels)
       echo "sync-labels is interactive in the CLI; no non-interactive API implementation yet." ;;
     exit)
