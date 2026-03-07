@@ -348,9 +348,9 @@ start_stack() {
   require_docker || return 1
 
   # Run preflight port conflict check
-  if [ -x "./resolve_port_conflicts.sh" ]; then
+  if [ -f "./resolve_port_conflicts.sh" ]; then
     echo -e "${yellow}Running preflight port conflict check...${reset}"
-    ./resolve_port_conflicts.sh || {
+    bash ./resolve_port_conflicts.sh || {
       echo -e "${red}Preflight check failed. Aborting stack start.${reset}"
       return 1
     }
