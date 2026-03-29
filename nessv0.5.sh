@@ -1,6 +1,19 @@
 #!/bin/bash
 
-set -u
+# Enhanced error handling to prevent unexpected exits
+error_handler() {
+  local exit_code=$?
+  local line_number=$1
+  echo -e "\n${red}[ ERROR ]${reset} Script exited unexpectedly"
+  echo -e "${yellow}Exit code:${reset} $exit_code"
+  echo -e "${yellow}Line:${reset} $line_number"
+  echo -e "${yellow}Hint:${reset} Check system resources and Docker daemon status"
+  exit $exit_code
+}
+
+set -uo pipefail
+trap 'error_handler $LINENO' ERR
+trap 'echo -e "\n${yellow}Script terminated by user${reset}"; exit 0' INT TERM
 
 SCRIPT_VERSION="0.5.0"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -50,12 +63,6 @@ MCP_CLIENT_SERVICES=(
   magic-wormhole-client
 )
 
-cyan="\033[1;36m"
-magenta="\033[1;35m"
-yellow="\033[1;33m"
-green="\033[1;32m"
-red="\033[1;31m"
-
 # NESS dark theme palette (foreground-only so background stays deep charcoal)
 primary="\033[38;5;45m"
 accent="\033[38;5;208m"
@@ -64,10 +71,18 @@ panel_fg="\033[38;5;252m"
 panel_border="\033[38;5;239m"
 panel_bg="\033[48;5;233m"
 title_glow="\033[38;5;213m"
+success="\033[38;5;46m"
+warning="\033[38;5;226m"
+error="\033[38;5;196m"
+info="\033[38;5;39m"
 reset="\033[0m"
 
-check_ok_symbol="[  OK  ]"
-check_fail_symbol="[ FAIL ]"
+# Enhanced symbols
+check_ok_symbol="✓"
+check_fail_symbol="✗"
+arrow_symbol="→"
+bullet_symbol="•"
+separator_symbol="═"
 
 load_dns_labels() {
   if [ -f "$DNS_LABEL_FILE" ]; then
@@ -201,9 +216,20 @@ select_profile() {
 
 require_docker() {
   if ! command -v "$CONTAINER_ENGINE" >/dev/null 2>&1; then
-    echo -e "${red}Container engine '$CONTAINER_ENGINE' is required but not installed.${reset}"
+    echo -e "${red}[ FAIL ]${reset} Container engine '$CONTAINER_ENGINE' is required but not installed."
+    echo -e "${yellow}Install:${reset} https://docs.docker.com/get-docker/"
     return 1
   fi
+  
+  # Check if Docker daemon is running
+  if ! docker info >/dev/null 2>&1; then
+    echo -e "${red}[ FAIL ]${reset} Docker daemon is not running."
+    echo -e "${yellow}Fix:${reset} Start Docker service or check permissions"
+    echo -e "${yellow}Linux:${reset} sudo systemctl start docker"
+    echo -e "${yellow}macOS/Windows:${reset} Start Docker Desktop"
+    return 1
+  fi
+  
   return 0
 }
 
@@ -273,10 +299,23 @@ check_port53_free() {
 compose_up_services() {
   local services=("$@")
   if [ ${#services[@]} -eq 0 ]; then
-    echo "No services defined for this profile yet."
+    echo -e "${red}[ FAIL ]${reset} No services defined for this profile yet."
     return 1
   fi
-  compose up -d "${services[@]}"
+  
+  echo -e "${muted}Starting services: ${services[*]}${reset}"
+  
+  for service in "${services[@]}"; do
+    echo -e "${yellow}Starting ${service}...${reset}"
+    if ! compose up -d "$service"; then
+      echo -e "${red}[ FAIL ]${reset} Failed to start ${service}"
+      echo -e "${yellow}Debug:${reset} Check logs with: docker compose logs ${service}"
+      return 1
+    fi
+    echo -e "${green}[  OK  ]${reset} ${service} started"
+  done
+  
+  echo -e "${green}[  OK  ]${reset} All services started successfully"
 }
 
 service_status() {
@@ -347,6 +386,31 @@ start_stack() {
   echo
   echo -e "${yellow}Starting Ness stack (Profile: $(profile_label "$PROFILE"))...${reset}"
   require_docker || return 1
+
+  # Check system resources
+  echo -e "${muted}Checking system resources...${reset}"
+  
+  # Check available disk space (need at least 5GB)
+  local available_space
+  available_space=$(df . | tail -1 | awk '{print $4}')
+  local space_gb=$((available_space / 1024 / 1024))
+  if [ "$space_gb" -lt 5 ]; then
+    echo -e "${red}[ FAIL ]${reset} Low disk space: ${space_gb}GB available (need 5GB minimum)"
+    echo -e "${yellow}Fix:${reset} Run 'docker system prune -f' to clean up"
+    return 1
+  fi
+  echo -e "${green}[  OK  ]${reset} Disk space: ${space_gb}GB available"
+
+  # Check available memory
+  if command -v free >/dev/null 2>&1; then
+    local available_mem
+    available_mem=$(free -m | awk 'NR==2{print $7}')
+    if [ "$available_mem" -lt 1024 ]; then
+      echo -e "${yellow}[ WARN ]${reset} Low memory: ${available_mem}MB available (recommend 1GB+)"
+    else
+      echo -e "${green}[  OK  ]${reset} Memory: ${available_mem}MB available"
+    fi
+  fi
 
   # Run preflight port conflict check
   if [ -f "./resolve_port_conflicts.sh" ]; then
@@ -428,8 +492,6 @@ stack_status() {
     "skywire:Skywire"
     "yggdrasil:Yggdrasil"
     "i2p-yggdrasil:I2P-Yggdrasil"
-    "amneziawg:AmneziaWG"
-    "skywire-amneziawg:Skywire-AmneziaWG"
   )
 
   local pair
@@ -458,10 +520,8 @@ logs_stack() {
     echo "  4) DNS reverse proxy"
     echo "  5) pyuheprng-privatenesstools"
     echo "  6) Yggdrasil"
-    echo "  7) I2P-Yggdrasil"
-    echo "  8) Skywire"
-    echo "  9) AmneziaWG"
-    echo " 10) Skywire-AmneziaWG"
+    echo "  7) Skywire"
+    echo "  8) I2P-Yggdrasil"
     echo "  0) Back"
     echo " 99) Exit (to shell)"
     echo
@@ -473,10 +533,8 @@ logs_stack() {
       4) compose logs -f dns-reverse-proxy ;;
       5) compose logs -f pyuheprng-privatenesstools ;;
       6) compose logs -f yggdrasil ;;
-      7) compose logs -f i2p-yggdrasil ;;
-      8) compose logs -f skywire ;;
-      9) compose logs -f amneziawg ;;
-      10) compose logs -f skywire-amneziawg ;;
+      7) compose logs -f skywire ;;
+      8) compose logs -f i2p-yggdrasil ;;
       0) return 0 ;;
       99) exit 0 ;;
       *) echo "Invalid option." ;;
@@ -518,8 +576,6 @@ build_single_image() {
     "pyuheprng-privatenesstools"
     "ipfs"
     "i2p-yggdrasil"
-    "amneziawg"
-    "skywire-amneziawg"
     "amnezia-exit"
     "ness-unified"
     "emercoin-mcp-server"
@@ -532,9 +588,11 @@ build_single_image() {
 
   echo -e "${green}Build single image (with context size hints):${reset}"
   local idx=1
+  local -a sizes
   for img in "${images[@]}"; do
     local size
     size=$(context_size "${SCRIPT_DIR}/${img}")
+    sizes+=($size)
     echo "  ${idx}) ${img} (context ~${size})"
     idx=$((idx+1))
   done
@@ -555,18 +613,48 @@ build_single_image() {
   fi
 
   local image="${images[$((choice-1))]}"
+  local context_size_val="${sizes[$((choice-1))]}"
   require_docker || return 1
 
   local context_path="${SCRIPT_DIR}/${image}"
   if [ ! -d "$context_path" ]; then
-    echo "Build context not found: $context_path"
+    echo -e "${red}[ FAIL ]${reset} Build context not found: ${context_path}"
     return 1
   fi
 
   local docker_user="${DOCKER_USER:-nessnetwork}"
   echo
-  echo -e "${yellow}Building ${docker_user}/${image}:latest...${reset}"
-  docker build -t "${docker_user}/${image}:latest" "$context_path"
+  echo -e "${primary}╔════════════════════════════════════════════════╗${reset}"
+  echo -e "${primary}║${reset}  ${accent}Building:${reset} ${docker_user}/${image}:latest"
+  echo -e "${primary}║${reset}  ${muted}Context:${reset}  ${context_path} (~${context_size_val})"
+  echo -e "${primary}╚════════════════════════════════════════════════╝${reset}"
+  echo
+  
+  # Pre-build checks
+  echo -e "${yellow}Pre-build checks:${reset}"
+  echo -e "  ${muted}Docker daemon:${reset} $(docker info >/dev/null 2>&1 && echo -e "${green}running${reset}" || echo -e "${red}not running${reset}")"
+  echo -e "  ${muted}Available disk:${reset} $(df -h "$context_path" 2>/dev/null | tail -1 | awk '{print $4}' || echo 'unknown')"
+  echo -e "  ${muted}Docker version:${reset} $(docker --version 2>/dev/null || echo 'not found')"
+  echo
+  
+  # Build with enhanced error reporting
+  echo -e "${yellow}Starting Docker build...${reset}"
+  if ! docker build -t "${docker_user}/${image}:latest" "$context_path" 2>&1; then
+    echo -e "\n${red}[ BUILD FAILED ]${reset} ${docker_user}/${image}:latest"
+    echo -e "${yellow}Debugging information:${reset}"
+    echo -e "  ${muted}Build context:${reset} $context_path"
+    echo -e "  ${muted}Context size:${reset} $context_size_val"
+    echo -e "  ${muted}Docker images:${reset} $(docker images 2>/dev/null | wc -l || echo 'unknown') total"
+    echo -e "  ${muted}Docker containers:${reset} $(docker ps -a 2>/dev/null | wc -l || echo 'unknown') total"
+    echo -e "${yellow}Common fixes:${reset}"
+    echo -e "  • Run 'docker system prune -f' to clean up"
+    echo -e "  • Check if Docker daemon is running"
+    echo -e "  • Verify sufficient disk space"
+    echo -e "  • Try building manually: cd $context_path && docker build -t ${docker_user}/${image}:latest ."
+    return 1
+  fi
+  
+  echo -e "${green}[  OK  ]${reset} Successfully built ${docker_user}/${image}:latest"
 }
 
 build_images_menu() {
@@ -580,12 +668,28 @@ build_images_menu() {
   echo
   read -rp "Select option: " b_choice
   case "$b_choice" in
-    1) ./build-all.sh ;;
-    2) ./build-multiarch.sh ;;
+    1)
+      echo -e "${yellow}Running build-all.sh...${reset}"
+      if ! ./build-all.sh; then
+        echo -e "${red}[ FAIL ]${reset} build-all.sh failed"
+        echo -e "${yellow}Hint:${reset} Check individual image builds and Docker daemon"
+      else
+        echo -e "${green}[  OK  ]${reset} All images built successfully"
+      fi
+      ;;
+    2)
+      echo -e "${yellow}Running build-multiarch.sh...${reset}"
+      if ! ./build-multiarch.sh; then
+        echo -e "${red}[ FAIL ]${reset} build-multiarch.sh failed"
+        echo -e "${yellow}Hint:${reset} Check registry access and buildx setup"
+      else
+        echo -e "${green}[  OK  ]${reset} Multi-arch build completed"
+      fi
+      ;;
     3) build_single_image ;;
     0) return 0 ;;
     99) exit 0 ;;
-    *) echo "Invalid option." ;;
+    *) echo -e "${red}Invalid option.${reset} Please select 0-3 or 99." ;;
   esac
 }
 
@@ -630,15 +734,13 @@ services_menu() {
     echo "  5) pyuheprng-privatenesstools"
     echo "  6) Yggdrasil"
     echo "  7) I2P-Yggdrasil"
-    echo "  8) AmneziaWG"
-    echo "  9) Skywire-AmneziaWG"
-    echo " 10) Emercoin MCP Server"
-    echo " 11) Privateness MCP Server"
-    echo " 12) Emercoin MCP App"
-    echo " 13) Privateness MCP App"
-    echo " 14) Magic Wormhole Rendezvous"
-    echo " 15) Magic Wormhole Transit"
-    echo " 16) Magic Wormhole Client"
+    echo "  8) Emercoin MCP Server"
+    echo "  9) Privateness MCP Server"
+    echo " 10) Emercoin MCP App"
+    echo " 11) Privateness MCP App"
+    echo " 12) Magic Wormhole Rendezvous"
+    echo " 13) Magic Wormhole Transit"
+    echo " 14) Magic Wormhole Client"
     echo "  0) Back"
     echo " 99) Exit (to shell)"
     echo
@@ -651,15 +753,13 @@ services_menu() {
       5) service_control_menu "pyuheprng-privatenesstools" "pyuheprng-privatenesstools" ;;
       6) service_control_menu "yggdrasil" "Yggdrasil" ;;
       7) service_control_menu "i2p-yggdrasil" "I2P-Yggdrasil" ;;
-      8) service_control_menu "amneziawg" "AmneziaWG" ;;
-      9) service_control_menu "skywire-amneziawg" "Skywire-AmneziaWG" ;;
-      10) service_control_menu "emercoin-mcp-server" "Emercoin MCP Server" ;;
-      11) service_control_menu "privateness-mcp-server" "Privateness MCP Server" ;;
-      12) service_control_menu "emercoin-mcp-app" "Emercoin MCP App" ;;
-      13) service_control_menu "privateness-mcp-app" "Privateness MCP App" ;;
-      14) service_control_menu "magic-wormhole-rendezvous" "Magic Wormhole Rendezvous" ;;
-      15) service_control_menu "magic-wormhole-transit" "Magic Wormhole Transit" ;;
-      16) service_control_menu "magic-wormhole-client" "Magic Wormhole Client" ;;
+      8) service_control_menu "emercoin-mcp-server" "Emercoin MCP Server" ;;
+      9) service_control_menu "privateness-mcp-server" "Privateness MCP Server" ;;
+      10) service_control_menu "emercoin-mcp-app" "Emercoin MCP App" ;;
+      11) service_control_menu "privateness-mcp-app" "Privateness MCP App" ;;
+      12) service_control_menu "magic-wormhole-rendezvous" "Magic Wormhole Rendezvous" ;;
+      13) service_control_menu "magic-wormhole-transit" "Magic Wormhole Transit" ;;
+      14) service_control_menu "magic-wormhole-client" "Magic Wormhole Client" ;;
       0) return 0 ;;
       99) exit 0 ;;
       *) echo "Invalid choice." ;;
@@ -840,86 +940,15 @@ test_i2p_yggdrasil() {
   fi
 }
 
-test_amneziawg() {
-  echo
-  echo -e "${yellow}Testing AmneziaWG tunnel (container + config + CLI)...${reset}"
-  local status
-  status=$(service_status "amneziawg")
-  if [ "$status" != "RUNNING" ]; then
-    echo -e " ${red}${check_fail_symbol}${reset} amneziawg container status: $status"
-    return 1
-  fi
-
-  echo -e " ${green}${check_ok_symbol}${reset} amneziawg container RUNNING"
-
-  # Config presence inside container
-  if MSYS_NO_PATHCONV=1 docker exec amneziawg test -f /etc/amneziawg/awg0.conf >/dev/null 2>&1; then
-    echo " -- /etc/amneziawg/awg0.conf present inside amneziawg container"
-  else
-    echo -e " ${red}${check_fail_symbol}${reset} /etc/amneziawg/awg0.conf missing in amneziawg container"
-    echo "    Hint: restart the amneziawg service so its entrypoint can generate a fresh config."
-    return 1
-  fi
-
-  # Useful CLI call via awg
-  local wg_info
-  wg_info=$(MSYS_NO_PATHCONV=1 docker exec amneziawg awg show awg0 2>/dev/null || true)
-  if [ -n "$wg_info" ]; then
-    echo " -- awg show awg0 (truncated):"
-    echo "$wg_info" | head -c 200; echo
-    echo -e " ${green}${check_ok_symbol}${reset} AmneziaWG CLI responding for awg0"
-    return 0
-  else
-    echo -e " ${red}${check_fail_symbol}${reset} awg show awg0 failed"
-    return 1
-  fi
-}
-
-test_skywire_amneziawg() {
-  echo
-  echo -e "${yellow}Testing Skywire-AmneziaWG access layer (container + config + CLI + HTTP)...${reset}"
-  if ! docker ps --format '{{.Names}}' | grep -q '^skywire-amneziawg$'; then
-    echo -e " ${red}${check_fail_symbol}${reset} skywire-amneziawg container not running"
-    return 1
-  fi
-
-  echo -e " ${green}${check_ok_symbol}${reset} skywire-amneziawg container RUNNING"
-
-  # Config presence inside container
-  if MSYS_NO_PATHCONV=1 docker exec skywire-amneziawg test -f /etc/amneziawg/awg0.conf >/dev/null 2>&1; then
-    echo " -- /etc/amneziawg/awg0.conf present inside skywire-amneziawg container"
-  else
-    echo -e " ${red}${check_fail_symbol}${reset} /etc/amneziawg/awg0.conf missing in skywire-amneziawg container"
-    echo "    Hint: restart the skywire-amneziawg service so its entrypoint can generate a fresh config."
-    return 1
-  fi
-
-  # Useful CLI call via skywire-cli
-  local visor_status
-  visor_status=$(MSYS_NO_PATHCONV=1 docker exec skywire-amneziawg skywire-cli visor status 2>/dev/null || true)
-  if [ -n "$visor_status" ]; then
-    echo " -- skywire-amneziawg skywire-cli visor status (truncated):"
-    echo "$visor_status" | head -c 200; echo
-    echo -e " ${green}${check_ok_symbol}${reset} Skywire-AmneziaWG CLI responding"
-  else
-    echo -e " ${red}${check_fail_symbol}${reset} skywire-amneziawg skywire-cli visor status failed"
-  fi
-
-  # HTTP check on the visor UI port mapped to 8002
-  check_tcp_port 127.0.0.1 8002 "Skywire-AmneziaWG visor UI" || true
-}
-
 test_full_node_overlays() {
   echo
-  echo -e "${yellow}Full node overlay/VPN services (Yggdrasil, I2P-Yggdrasil, Skywire, AmneziaWG, Skywire-AmneziaWG)...${reset}"
+  echo -e "${yellow}Full node overlay/VPN services (Yggdrasil, I2P-Yggdrasil, Skywire)...${reset}"
   require_docker || return 1
   local rc=0
 
   test_yggdrasil || rc=1
   test_i2p_yggdrasil || rc=1
   test_skywire || rc=1
-  test_amneziawg || rc=1
-  test_skywire_amneziawg || rc=1
 
   echo
   echo -e "${green}===== OVERLAY / VPN CONFIG SUMMARY =====${reset}"
@@ -965,34 +994,6 @@ test_full_node_overlays() {
     c_sky="n/a (container not present)"
   fi
   printf "  %-18s : %s, config: %s\n" "Skywire" "$s_sky" "$c_sky"
-
-  # AmneziaWG (standalone)
-  local s_awg c_awg
-  s_awg=$(service_status "amneziawg")
-  if [ "$s_awg" = "RUNNING" ] || [ "$s_awg" = "STOPPED" ]; then
-    if MSYS_NO_PATHCONV=1 docker exec amneziawg test -f /etc/amneziawg/awg0.conf >/dev/null 2>&1; then
-      c_awg="present (/etc/amneziawg/awg0.conf)"
-    else
-      c_awg="missing (/etc/amneziawg/awg0.conf)"
-    fi
-  else
-    c_awg="n/a (container not present)"
-  fi
-  printf "  %-18s : %s, config: %s\n" "AmneziaWG" "$s_awg" "$c_awg"
-
-  # Skywire-AmneziaWG (access layer + visor)
-  local s_sawg c_sawg
-  s_sawg=$(service_status "skywire-amneziawg")
-  if [ "$s_sawg" = "RUNNING" ] || [ "$s_sawg" = "STOPPED" ]; then
-    if MSYS_NO_PATHCONV=1 docker exec skywire-amneziawg test -f /etc/amneziawg/awg0.conf >/dev/null 2>&1; then
-      c_sawg="present (/etc/amneziawg/awg0.conf)"
-    else
-      c_sawg="missing (/etc/amneziawg/awg0.conf)"
-    fi
-  else
-    c_sawg="n/a (container not present)"
-  fi
-  printf "  %-18s : %s, config: %s\n" "Skywire-AmneziaWG" "$s_sawg" "$c_sawg"
 
   echo
   if [ "$rc" -eq 0 ]; then
@@ -1301,7 +1302,12 @@ api_dispatch() {
       local docker_user="${DOCKER_USER:-nessnetwork}"
       echo
       echo -e "${yellow}Building ${docker_user}/${IMAGE}:latest from ${context_path}..."
-      docker build -t "${docker_user}/${IMAGE}:latest" "$context_path" ;;
+      if ! docker build -t "${docker_user}/${IMAGE}:latest" "$context_path"; then
+        echo -e "${red}${check_fail_symbol}${reset} Failed to build ${docker_user}/${IMAGE}:latest"
+        return 1
+      fi
+      echo -e "${green}${check_ok_symbol}${reset} Successfully built ${docker_user}/${IMAGE}:latest"
+      ;;
     health-check)
       health_check ;;
     test-full-node-overlays)
@@ -1413,9 +1419,14 @@ menu() {
     echo "  8) Remove everything local"
     echo " 99) Exit (force exit)"
     echo
-    read -rp "Select an option: " choice || break
+    if ! read -rp "Select an option: " choice; then
+      echo -e "\n${yellow}EOF detected. Exiting gracefully...${reset}"
+      exit 0
+    fi
+    
     case "$choice" in
       0)
+        echo -e "${green}Exiting Ness control panel...${reset}"
         exit 0 ;;
       1) select_dns_mode ;;
       2) select_profile ;;
@@ -1425,15 +1436,37 @@ menu() {
       6) logs_stack ;;
       7) test_menu ;;
       8) remove_everything_local ;;
-      99) exit 0 ;;
-      *) echo "Invalid choice." ;;
+      99) 
+        echo -e "${red}Force exit requested...${reset}"
+        exit 0 ;;
+      *)
+        echo -e "${red}Invalid choice.${reset} Please select 0-8 or 99."
+        ;;
     esac
     echo
-    read -rp "Press Enter to continue..." _pause || break
+    if ! read -rp "Press Enter to continue..." _pause; then
+      echo -e "\n${yellow}EOF detected. Exiting gracefully...${reset}"
+      exit 0
+    fi
   done
 }
 
 apply_dns_mode
+
+# Show startup banner and system info
+echo -e "${primary}========================================${reset}"
+echo -e "${title_glow}        N E S S   v${SCRIPT_VERSION}   Control Panel        ${reset}"
+echo -e "${primary}========================================${reset}"
+echo -e " Profile: ${accent}$(profile_label "$PROFILE")${reset} | DNS Mode: ${accent}$DNS_MODE${reset}"
+echo -e " Docker: ${accent}$CONTAINER_ENGINE${reset} | User: ${accent}$DOCKER_USER${reset}"
+echo -e "${panel_bg}${panel_border}────────────────────────────────────────${reset}"
+
+# Quick system check
+if command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; then
+  echo -e "${green}[  OK  ]${reset} Docker daemon running"
+else
+  echo -e "${red}[ FAIL ]${reset} Docker daemon issues detected"
+fi
 
 case "${1-}" in
   api)
