@@ -1,4 +1,8 @@
 #!/usr/bin/env bash
+#
+# DEPRECATED: Use ness-tui.sh instead (fixes infinite recursion bug)
+# Kept as reference - this has the docker() wrapper recursion issue
+#
 
 set -u
 

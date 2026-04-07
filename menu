@@ -1,0 +1,186 @@
+#!/bin/bash
+# NESS Hub Menu - Podman/Docker Stack Manager
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" 2>/dev/null && pwd || echo ".")"
+cd "$SCRIPT_DIR" 2>/dev/null || true
+
+# Auto-detect container engine
+if command -v podman-compose &>/dev/null && podman info &>/dev/null; then
+    ENGINE="podman-compose"
+    RUNTIME="podman"
+else
+    ENGINE="docker-compose"
+    RUNTIME="docker"
+fi
+
+PROFILE="${PROFILE:-pi3}"
+R=$'\033[0m'
+G=$'\033[32m'
+Y=$'\033[33m'
+C=$'\033[36m'
+B=$'\033[1m'
+
+get_services() {
+    case "$PROFILE" in
+        pi3) echo "emercoin-core privateness skywire dns-reverse-proxy pyuheprng-privatenesstools" ;;
+        skyminer) echo "emercoin-core privateness dns-reverse-proxy pyuheprng-privatenesstools" ;;
+        full) echo "emercoin-core yggdrasil i2p-yggdrasil skywire privateness dns-reverse-proxy pyuheprng-privatenesstools" ;;
+        *) echo "emercoin-core privateness" ;;
+    esac
+}
+
+check_status() {
+    if $RUNTIME ps --filter "name=$1" --format '{{.Status}}' 2>/dev/null | grep -q "Up"; then
+        echo "${G}●${R}"
+    else
+        echo "${Y}○${R}"
+    fi
+}
+
+show_menu() {
+    clear
+    echo "${B}${C}=== NESS Hub Stack Manager ===${R}"
+    printf "Profile: ${B}%-10s${R} Engine: ${B}%-7s${R}\n" "$PROFILE" "$RUNTIME"
+    echo
+    echo "Services:"
+    for svc in $(get_services); do
+        printf "  %s %-20s\n" "$(check_status $svc)" "$svc"
+    done
+    echo
+    echo "  ${B}[1]${R} Start      [5] Logs      [9] Profile"
+    echo "  ${B}[2]${R} Stop       [6] Health    [0] Exit"
+    echo "  ${B}[3]${R} Restart    [7] Update    [10] Build Tools"
+    echo "  ${B}[4]${R} Status     [8] Clean Up"
+    echo
+}
+
+cleanup() {
+    for svc in emercoin-core privateness skywire dns-reverse-proxy pyuheprng-privatenesstools yggdrasil i2p-yggdrasil; do
+        $RUNTIME stop $svc &>/dev/null || true
+        $RUNTIME rm -f $svc &>/dev/null || true
+    done
+    $ENGINE down &>/dev/null || true
+}
+
+do_start() {
+    echo "${C}Starting...${R}"
+    cleanup
+    sleep 1
+    if [ "$PROFILE" = "pi3" ] || [ "$PROFILE" = "skyminer" ]; then
+        $RUNTIME run -d --replace --name emercoin-core -p 6661:6661 -p 6662:6662 \
+            -v emercoin-data:/data nessnetwork/emercoin-core:latest &>/dev/null || \
+            $ENGINE up -d emercoin-core 2>/dev/null || true
+        sleep 3
+        local others=$(get_services | sed 's/emercoin-core //')
+        $ENGINE up -d $others 2>/dev/null || true
+    else
+        $ENGINE up -d 2>/dev/null || true
+    fi
+    echo "${G}✓ Started${R}"
+    sleep 1
+}
+
+do_stop() {
+    echo "${C}Stopping...${R}"
+    cleanup
+    echo "${G}✓ Stopped${R}"
+    sleep 1
+}
+
+do_restart() { do_stop; sleep 2; do_start; }
+
+do_status() {
+    echo "${C}Status:${R}"
+    $ENGINE ps 2>/dev/null || echo "No containers"
+}
+
+do_logs() {
+    echo "${C}Logs (Ctrl+C to exit):${R}"
+    $ENGINE logs -f --tail=50 2>/dev/null || echo "No logs"
+}
+
+do_health() {
+    echo "${C}Health Check:${R}"
+    for port in 6661 6662 6660 5000 8053 8000; do
+        if nc -z 127.0.0.1 $port 2>/dev/null; then
+            printf "  ${G}✓${R} Port %s: open\n" "$port"
+        else
+            printf "  ${Y}○${R} Port %s: closed\n" "$port"
+        fi
+    done
+}
+
+do_pull() {
+    echo "${C}Pulling images...${R}"
+    $ENGINE pull 2>/dev/null || echo "Done"
+}
+
+do_cleanup() {
+    echo "${C}Cleaning up...${R}"
+    $RUNTIME container prune -f 2>/dev/null || true
+    $RUNTIME image prune -f 2>/dev/null || true
+    echo "${G}✓ Cleaned${R}"
+}
+
+do_profile() {
+    read -rp "Profile [pi3/skyminer/full]: " p
+    case "$p" in pi3|skyminer|full) PROFILE="$p"; echo "Set to: $PROFILE" ;; esac
+    sleep 1
+}
+
+do_build_tools() {
+    local REPO="github.com/ness-network/privatenesstools"
+    local SRC_DIR="privatenesstools-src"
+    
+    echo "${C}Building privatenesstools from source...${R}"
+    echo "  Repo: $REPO"
+    
+    # Clone if not exists
+    if [ ! -d "$SRC_DIR/.git" ]; then
+        echo "  → Cloning repository..."
+        rm -rf "$SRC_DIR" 2>/dev/null || true
+        git clone "https://${REPO}.git" "$SRC_DIR" || {
+            echo "${Y}Failed to clone. Check internet connection.${R}"
+            return 1
+        }
+    else
+        echo "  → Updating existing clone..."
+        cd "$SRC_DIR" && git pull && cd ..
+    fi
+    
+    # Check for pyuheprng
+    if [ -f "$SRC_DIR/pyuheprng/pyuheprng.py" ] || [ -d "$SRC_DIR/pyuheprng" ]; then
+        echo "${G}✓ pyuheprng found in repository${R}"
+    else
+        echo "${Y}⚠ pyuheprng not found in expected location${R}"
+    fi
+    
+    # Build with podman/docker
+    if [ -f "$SRC_DIR/Dockerfile" ]; then
+        echo "  → Building container image..."
+        $RUNTIME build -t nessnetwork/pyuheprng-privatenesstools:latest "$SRC_DIR" || {
+            echo "${Y}Build failed${R}"
+            return 1
+        }
+        echo "${G}✓ Built nessnetwork/pyuheprng-privatenesstools:latest${R}"
+    else
+        echo "${Y}No Dockerfile found - using local pyuheprng-privatenesstools/ folder${R}"
+        if [ -f "pyuheprng-privatenesstools/Dockerfile" ]; then
+            $RUNTIME build -t nessnetwork/pyuheprng-privatenesstools:latest pyuheprng-privatenesstools/
+            echo "${G}✓ Built from local source${R}"
+        fi
+    fi
+    
+    sleep 1
+}
+
+while true; do
+    show_menu
+    read -rp "Select: " c
+    case "$c" in
+        1) do_start ;; 2) do_stop ;; 3) do_restart ;; 4) do_status ;;
+        5) do_logs ;; 6) do_health ;; 7) do_pull ;; 8) do_cleanup ;;
+        9) do_profile ;; 10) do_build_tools ;; 0|q) exit 0 ;; *) echo "Invalid"; sleep 1 ;;
+    esac
+    read -rp "Press Enter..."
+done

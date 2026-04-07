@@ -1,0 +1,50 @@
+#!/bin/bash
+# Simple NESS menu - uses podman-compose
+
+cd "$(dirname "$0")"
+ENGINE="podman-compose"
+PROFILE="${PROFILE:-pi3}"
+
+clear
+echo "=== NESS Menu ==="
+echo "Profile: $PROFILE"
+echo ""
+echo "[1] Start Stack"
+echo "[2] Stop Stack"  
+echo "[3] Status"
+echo "[4] Logs"
+echo "[5] Switch Profile (pi3/skyminer/full)"
+echo "[0] Exit"
+echo ""
+read -p "Select: " c
+
+case $c in
+  1)
+    echo "Starting..."
+    $ENGINE down 2>/dev/null || true
+    if [ "$PROFILE" = "pi3" ]; then
+      $ENGINE up -d emercoin-core
+      sleep 2
+      $ENGINE up -d privateness skywire dns-reverse-proxy pyuheprng-privatenesstools
+    elif [ "$PROFILE" = "skyminer" ]; then
+      $ENGINE up -d emercoin-core privateness dns-reverse-proxy pyuheprng-privatenesstools
+    else
+      $ENGINE up -d
+    fi
+    echo "Done"
+    ;;
+  2)
+    echo "Stopping..."
+    $ENGINE down
+    ;;
+  3)
+    $ENGINE ps
+    ;;
+  4)
+    $ENGINE logs -f --tail=50
+    ;;
+  5)
+    read -p "Profile (pi3/skyminer/full): " p
+    echo "PROFILE=$p" > .profile
+    ;;
+esac
