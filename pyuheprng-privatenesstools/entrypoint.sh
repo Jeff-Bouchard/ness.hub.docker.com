@@ -64,7 +64,18 @@ echo "=========================================="
 echo "Starting combined services..."
 echo "  pyuheprng: Feeding /dev/random"
 echo "  privatenesstools: Network utilities"
+if [ -n "${RESEED_INTERVAL:-}" ]; then
+    echo "  pyuheprng-reseeder: Reseeding every ${RESEED_INTERVAL}s"
+fi
 echo "=========================================="
+
+# Enable reseeder if requested
+if [ -n "${RESEED_INTERVAL:-}" ]; then
+    echo "Enabling pyuheprng-reseeder with interval: ${RESEED_INTERVAL}s"
+    sed -i "s/autostart=false/autostart=true/" /etc/supervisor/conf.d/supervisord.conf
+    # Update the sleep interval in the command
+    sed -i "s/sleep 10/sleep ${RESEED_INTERVAL}/" /etc/supervisor/conf.d/supervisord.conf
+fi
 
 # Create log directory
 mkdir -p /var/log/supervisor

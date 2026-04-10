@@ -108,8 +108,6 @@ If any factor fails, the node can still run whatever it wants, but higher-level 
 
 *   [**ipfs/README.md**](ipfs/README.md) - IPFS daemon, Emercoin integration
 *   [**pyuheprng/README.md**](pyuheprng/README.md) - Entropy service documentation
-*   [**amneziawg/README.md**](amneziawg/README.md) - Stealth VPN configuration
-*   [**skywire-amneziawg/README.md**](skywire-amneziawg/README.md) - Access layer integration
 *   [**CONCEPT.md**](doc/CONCEPT.md) - Perception/Reality architecture notes
 
 ## Perception → Reality Concept
@@ -119,8 +117,6 @@ If any factor fails, the node can still run whatever it wants, but higher-level 
 3.  **Clearnet existence toggle** reverses or restores access to non-Emer TLDs; OFF means unknown names are NXDOMAIN/blackholed and the node only perceives EmerDNS, ON adds controlled clearnet forwarders.
 4.  **Transport graph**: WG-in → Skywire → Yggdrasil → (optional i2pd Ygg-only) → WG/XRAY-out → clearnet. All visor-to-visor traffic stays on Ygg; optional i2p runs strictly inside Ygg-only mode.
 5.  **Identity-to-config pipeline**: an external orchestrator reads Emercoin entries, derives `wg.conf`, `xray config.json`, Skywire/Ygg config, DNS policy, and writes them into each container, which never contacts untrusted infrastructure directly.
-6.  **Amnezia exits** are the only clearnet-visible surfaces. The new `amnezia-exit` image builds `amnezia-xray-core`, installs `amneziawg-tools`, and expects `wg.conf` + `config.json` from these EmerDNS identities.
-
 ## Images
 
 ### 1\. emercoin-core
@@ -237,31 +233,7 @@ docker run -d \
 
 Integrates with Emercoin for decentralized naming (IPFS hashes stored in blockchain).
 
-### 11\. amneziawg
-
-AmneziaWG (stealth WireGuard with obfuscation)
-
-```plaintext
-docker build -t nessnetwork/amneziawg ./amneziawg
-docker run --cap-add=NET_ADMIN --cap-add=SYS_MODULE --device /dev/net/tun \
-  -p 51820:51820/udp -v awg-config:/etc/amneziawg \
-  nessnetwork/amneziawg
-```
-
-### 12\. skywire-amneziawg
-
-Access Layer: AmneziaWG stealth VPN → Skywire mesh routing
-
-```plaintext
-docker build -t ness-network/skywire-amneziawg ./skywire-amneziawg
-docker run --cap-add=NET_ADMIN --cap-add=SYS_MODULE --device /dev/net/tun \
-  -p 8001:8000 -p 51821:51820/udp \
-  ness-network/skywire-amneziawg
-```
-
-Clients connect via AmneziaWG, traffic routes through Skywire mesh.
-
-### 13\. ness-unified
+### 11\. ness-unified
 
 All services combined in one container
 
@@ -339,7 +311,7 @@ docker-compose -f docker-compose.minimal.yml up -d
 
 See [NETWORK-ARCHITECTURE.md](NETWORK-ARCHITECTURE.md) for a detailed description. At a high level, traffic can flow as:
 
-`AmneziaWG (obfuscated) → Skywire (MPLS-style mesh) → Yggdrasil (IPv6) → I2P (garlic) → Blockchain DNS`
+`Skywire (MPLS-style mesh) → Yggdrasil (IPv6) → I2P (garlic) → Blockchain DNS`
 
 Some design aspects:
 
@@ -382,6 +354,6 @@ docker login
 
 ## External References
 
-For the external specifications and documentation that underpin this stack (Linux RNG behavior, UHEPRNG, Emercoin RC4OK/EmerDNS/EmerNVS, Yggdrasil, I2P, WireGuard/AmneziaWG, IPFS, Windows NRPT, reproducible builds), see:
+For the external specifications and documentation that underpin this stack (Linux RNG behavior, UHEPRNG, Emercoin RC4OK/EmerDNS/EmerNVS, Yggdrasil, I2P, IPFS, Windows NRPT, reproducible builds), see:
 
 - `doc/SOURCES.md` in this repository – consolidated reference list

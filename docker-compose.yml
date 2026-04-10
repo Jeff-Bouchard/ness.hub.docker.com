@@ -20,6 +20,9 @@ services:
   yggdrasil:
     image: nessnetwork/yggdrasil
     container_name: yggdrasil
+    command: >
+      sh -c 'if [ ! -f /etc/yggdrasil.conf ]; then yggdrasil -genconf > /etc/yggdrasil.conf; fi;
+      exec yggdrasil -useconffile /etc/yggdrasil.conf'
     ports:
       - "${YGGDRASIL_PORT:-9001}:9001"
     volumes:
@@ -60,6 +63,46 @@ services:
     volumes:
       - skywire-data:/root/.skywire
     restart: unless-stopped
+    depends_on:
+      emercoin-core:
+        condition: service_healthy
+
+  ssh-gateway:
+    image: lscr.io/linuxserver/openssh-server:latest
+    container_name: ssh-gateway
+    env_file:
+      - ./.ssh-admin.env
+    environment:
+      - PUID=0
+      - PGID=0
+      - SUDO_ACCESS=true
+      - PASSWORD_ACCESS=true
+      - USER_NAME=root
+    ports:
+      - "${SSH_GATEWAY_PORT:-2222}:2222"
+    volumes:
+      - ssh-gateway-config:/config
+    restart: unless-stopped
+    networks:
+      - ness-network
+
+  softether-vpn:
+    build: ./softether
+    container_name: softether-vpn
+    environment:
+      - SOFTETHER_ADMIN_PASSWORD=${SOFTETHER_ADMIN_PASSWORD:-changeme}
+      - SOFTETHER_ENABLE_WG=1
+    ports:
+      - "${SOFTETHER_VPN_PORT:-443}:443/udp"
+    expose:
+      - "5555"
+    volumes:
+      - softether-data:/usr/local/vpnserver
+    cap_add:
+      - NET_ADMIN
+    restart: unless-stopped
+    networks:
+      - ness-network
     depends_on:
       emercoin-core:
         condition: service_healthy
@@ -116,8 +159,9 @@ volumes:
   yggdrasil-data:
   i2p-data:
   skywire-data:
+  ssh-gateway-config:
+  softether-data:
 
 networks:
-  default:
-    name: ness-network
+  ness-network:
     driver: bridge

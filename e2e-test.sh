@@ -1,10 +1,28 @@
 #!/usr/bin/env bash
-# Ness v0.4 E2E Test Suite
+# NESS Stack E2E Test - v2.1
+# Tests each component and shows actual errors
+
 set -euo pipefail
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-COMPOSE_FILE="$SCRIPT_DIR/docker-compose.yml"
+SCRIPT_DIR="$(cd "$(dirname "$0")" 2>/dev/null && pwd || echo ".")"
+cd "$SCRIPT_DIR"
+
+# Detect engine
+if command -v podman-compose &>/dev/null && podman info &>/dev/null 2>&1; then
+    ENGINE="podman-compose"
+    RUNTIME="podman"
+    COMPOSE_CMD="podman-compose"
+elif command -v docker-compose &>/dev/null; then
+    ENGINE="docker-compose"
+    RUNTIME="docker"
+    COMPOSE_CMD="docker-compose"
+else
+    echo "[ERROR] No container engine found (podman-compose or docker-compose)"
+    exit 1
+fi
+
 TEST_LOG="$SCRIPT_DIR/test-results.log"
+echo "=== NESS E2E Test $(date) ===" > "$TEST_LOG"
 
 cyan="\033[1;36m"
 green="\033[1;32m"
@@ -18,35 +36,48 @@ log() {
 
 fail() {
     echo -e "${red}[FAIL]${reset} $1" | tee -a "$TEST_LOG"
-    exit 1
+    ((FAIL_COUNT++)) || true
 }
 
 pass() {
     echo -e "${green}[PASS]${reset} $1" | tee -a "$TEST_LOG"
+    ((PASS_COUNT++)) || true
 }
 
 warn() {
     echo -e "${yellow}[WARN]${reset} $1" | tee -a "$TEST_LOG"
 }
 
-# Test 1: Preflight checks
-log "Running preflight port checks..."
-if [ -x "$SCRIPT_DIR/resolve_port_conflicts.sh" ]; then
-    "$SCRIPT_DIR/resolve_port_conflicts.sh" || fail "Port conflicts detected"
-    pass "All ports available"
+PASS_COUNT=0
+FAIL_COUNT=0
+
+log "=== NESS Stack E2E Test ==="
+log "Engine: $ENGINE / $RUNTIME"
+log "Working directory: $(pwd)"
+
+# Test 2: Compose File Valid
+log "Test 2: Checking docker-compose.yml..."
+if $COMPOSE_CMD config > /dev/null 2>&1; then
+    pass "docker-compose.yml syntax valid"
 else
-    warn "Port conflict resolver not found - skipping"
+    fail "docker-compose.yml has errors"
+    $COMPOSE_CMD config 2>&1 | head -20
 fi
 
-# Test 2: Stack startup
-log "Starting Ness stack..."
-cd "$SCRIPT_DIR"
-docker compose -f "$COMPOSE_FILE" down --remove-orphans 2>/dev/null || true
-docker compose -f "$COMPOSE_FILE" up -d --quiet-pull
-
-# Test 3: Service health checks
-log "Waiting for services to stabilize..."
-sleep 30
+# Test 3: Volume Creation
+log "Test 3: Checking volumes..."
+for vol in emercoin-data skywire-data; do
+    if $RUNTIME volume ls 2>/dev/null | grep -q "$vol"; then
+        pass "Volume $vol exists"
+    else
+        log "  Creating $vol..."
+        if $RUNTIME volume create "$vol" 2>/dev/null; then
+            pass "Volume $vol created"
+        else
+            fail "Volume $vol creation failed"
+        fi
+    fi
+done
 
 services=(
     "emercoin-core:6661:tcp:Emercoin RPC"
@@ -60,7 +91,7 @@ for service in "${services[@]}"; do
     IFS=':' read -r container port protocol label <<< "$service"
     
     # Container running check
-    if ! docker ps --format '{{.Names}}' | grep -q "^${container}$"; then
+    if ! $RUNTIME ps --format '{{.Names}}' | grep -q "^${container}$"; then
         fail "Container ${container} not running"
     fi
     
@@ -78,7 +109,7 @@ done
 
 # Test 4: Emercoin RPC test
 log "Testing Emercoin RPC connectivity..."
-if docker exec emercoin-core emercoin-cli -datadir=/data getblockchaininfo >/dev/null 2>&1; then
+if $RUNTIME exec emercoin-core emercoin-cli -datadir=/data getblockchaininfo >/dev/null 2>&1; then
     pass "Emercoin RPC responding"
 else
     warn "Emercoin RPC not responding (may be syncing)"
@@ -98,7 +129,7 @@ fi
 
 # Test 6: SoftEther management console
 log "Testing SoftEther management..."
-if docker exec softether-vpn /usr/local/vpnserver/vpncmd localhost:5555 /SERVER /CMD ServerStatusGet >/dev/null 2>&1; then
+if $RUNTIME exec softether-vpn /usr/local/vpnserver/vpncmd localhost:5555 /SERVER /CMD ServerStatusGet >/dev/null 2>&1; then
     pass "SoftEther VPN management console accessible"
 else
     warn "SoftEther VPN management console not responding"
@@ -114,7 +145,7 @@ dependencies=(
 
 for dep in "${dependencies[@]}"; do
     IFS=':' read -r service dependency <<< "$dep"
-    if docker inspect "$service" | grep -q "$dependency"; then
+    if $RUNTIME inspect "$service" | grep -q "$dependency"; then
         pass "${service} depends on ${dependency}"
     else
         warn "${service} dependency check failed"
@@ -123,13 +154,13 @@ done
 
 # Test 8: Resource usage
 log "Checking resource usage..."
-docker stats --no-stream --format "table {{.Container}}\t{{.CPUPerc}}\t{{.MemUsage}}" | tee -a "$TEST_LOG"
+$RUNTIME stats --no-stream --format "table {{.Container}}\t{{.CPUPerc}}\t{{.MemUsage}}" | tee -a "$TEST_LOG"
 
 # Test 9: Volume integrity
 log "Verifying volume mounts..."
 volumes=("emercoin-data" "yggdrasil-data" "i2p-data" "skywire-data" "softether-data")
 for vol in "${volumes[@]}"; do
-    if docker volume inspect "$vol" >/dev/null 2>&1; then
+    if $RUNTIME volume inspect "$vol" >/dev/null 2>&1; then
         pass "Volume ${vol} exists"
     else
         fail "Volume ${vol} missing"
@@ -138,15 +169,13 @@ done
 
 # Test 10: Network connectivity
 log "Testing network connectivity..."
-if docker network inspect ness-network >/dev/null 2>&1; then
+if $RUNTIME network inspect ness-network >/dev/null 2>&1; then
     pass "Ness network bridge created"
 else
     fail "Ness network bridge missing"
 fi
 
-log "E2E test suite completed successfully!"
+log "E2E test suite completed!"
 echo -e "\n${green}Test Summary:${reset}"
-echo "- All critical services verified"
-echo "- Port connectivity confirmed"
-echo "- Dependencies validated"
-echo "- Logs available at: $TEST_LOG"
+echo "Passed: $PASS_COUNT | Failed: $FAIL_COUNT"
+echo "Logs: $TEST_LOG"

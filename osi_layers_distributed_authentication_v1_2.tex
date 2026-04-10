@@ -1,0 +1,544 @@
+\documentclass[11pt,a4paper]{article}
+
+% Packages
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage{amsmath,amssymb}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{hyperref}
+\usepackage{natbib}
+\usepackage{geometry}
+\usepackage{enumitem}
+\usepackage{microtype}
+
+% Page geometry
+\geometry{margin=2.5cm}
+
+% Hyperref setup
+\hypersetup{
+    colorlinks=true,
+    linkcolor=black,
+    citecolor=black,
+    urlcolor=black,
+    pdftitle={Distributed Authentication Procedures Across Network Layer Architectures},
+    pdfauthor={},
+    pdfkeywords={distributed systems, authentication protocols, OSI model, public-key cryptography, network architecture}
+}
+
+% Title formatting
+\title{\bfseries Distributed Authentication Procedures Across Network Layer Architectures: A Technical Analysis}
+\author{}
+\date{Version 1.2, April 2026}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+\noindent
+This paper examines the architectural considerations for implementing cryptographic authentication procedures across the Open Systems Interconnection (OSI) reference model layers. We analyze the technical requirements, security implications, and practical limitations of deploying signature-based authentication mechanisms in distributed network environments. The analysis focuses on the separation between application-layer cryptographic operations and underlying network infrastructure, with particular attention to the distinction between logical decentralization at higher layers and the physical realities of network topology at lower layers.
+\end{abstract}
+
+\vspace{0.5cm}
+\noindent\textbf{Keywords:} distributed systems, authentication protocols, OSI model, public-key cryptography, network architecture
+
+\section{Introduction}
+
+The OSI reference model (ISO/IEC 7498-1) provides a conceptual framework for understanding network communication through seven abstraction layers \citep{iso1994}. While the model itself is pedagogical rather than prescriptive, it remains useful for analyzing how security mechanisms operate at different levels of the networking stack.
+
+This paper examines how cryptographic authentication procedures---specifically challenge-response protocols using digital signatures---interact with network infrastructure across OSI layers. We focus on UTXO-based (Unspent Transaction Output) signature verification as a canonical example of deterministic authentication, and analyze the technical realities of implementing such systems in practice.
+
+\subsection{Scope and Limitations}
+
+It is important to note that the OSI model represents a conceptual abstraction. Modern Internet architecture typically follows the TCP/IP model, which consolidates some OSI layers \citep{cerf1974}. Furthermore, claims of ``decentralization'' must be evaluated against specific technical criteria---distributed topology, fault tolerance, and absence of single points of failure---rather than asserted categorically.
+
+\section{Background}
+
+\subsection{Digital Signature Authentication}
+
+Public-key cryptography enables authentication through digital signatures. In a challenge-response protocol:
+
+\begin{enumerate}
+    \item A verifier generates a nonce (challenge)
+    \item The prover signs the nonce with their private key
+    \item The verifier checks the signature against the prover's public key
+    \item Successful verification proves possession of the private key
+\end{enumerate}
+
+This procedure is mathematically deterministic: given a valid key pair and correct implementation, verification either succeeds or fails \citep{diffie1976}.
+
+\subsection{OSI Model Overview}
+
+\begin{table}[h]
+\centering
+\caption{OSI reference model layers \citep{iso1994}}
+\begin{tabular}{@{}cll@{}}
+\toprule
+\textbf{Layer} & \textbf{Name} & \textbf{Primary Function} \\
+\midrule
+7 & Application & User-facing services and protocols \\
+6 & Presentation & Data formatting, encryption, encoding \\
+5 & Session & Connection management and state \\
+4 & Transport & End-to-end delivery, reliability \\
+3 & Network & Routing and logical addressing \\
+2 & Data Link & Frame delivery, MAC addressing \\
+1 & Physical & Bit transmission over media \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\section{Layer-by-Layer Analysis}
+
+\subsection{Layer 7: Application Layer}
+
+\textbf{Technical Function:} The application layer provides interfaces for user-facing services, including authentication protocols.
+
+\textbf{Cryptographic Implementation:} Digital signature verification operates at this layer as a software procedure. The mathematical operation---typically ECDSA or Ed25519 signature verification---produces a boolean result based on the inputs (message, signature, public key) \citep{nist2023}.
+
+\textbf{Architectural Considerations:}
+\begin{itemize}[leftmargin=*]
+    \item Authentication logic is implemented in application code
+    \item The procedure is deterministic given correct inputs
+    \item No additional trust assumptions are required beyond the cryptographic primitive
+\end{itemize}
+
+\textbf{Practical Limitations:}
+\begin{itemize}[leftmargin=*]
+    \item Application layer implementation quality varies
+    \item User interface design affects security outcomes
+    \item Key management remains a significant challenge
+\end{itemize}
+
+\subsection{Layer 6: Presentation Layer}
+
+\textbf{Technical Function:} Handles data representation, encoding, and encryption/decryption for network transmission.
+
+\textbf{Cryptographic Implementation:}
+\begin{itemize}[leftmargin=*]
+    \item Canonicalization algorithms ensure consistent message representation before signing
+    \item Encoding schemes (Base64, base58, base64url) transform binary signatures for transmission
+    \item Encryption may be applied to protect data in transit
+\end{itemize}
+
+\textbf{Standardization:}
+Cryptographic primitives and encoding standards are defined by bodies such as NIST, IETF, and ANSI \citep{nist2023, rfc8032}.
+
+\subsection{Layer 5: Session Layer}
+
+\textbf{Technical Function:} Manages dialog control and connection state between applications.
+
+\textbf{Authentication Sessions:}
+Challenge-response authentication creates ephemeral session state:
+\begin{itemize}[leftmargin=*]
+    \item The challenge is generated and stored by the verifier
+    \item The response is received and validated
+    \item Session state may persist after authentication for continued authorization
+\end{itemize}
+
+\textbf{Stateless vs. Stateful Operation:}
+Authentication may be stateless (each request independently verified) or stateful (session tokens issued post-verification). Stateless operation reduces server-side storage requirements but may increase computational overhead \citep{rfc7230}.
+
+\subsection{Layer 4: Transport Layer}
+
+\textbf{Technical Function:} Provides end-to-end communication services, including TCP and UDP protocols.
+
+\textbf{Transport Security:}
+\begin{itemize}[leftmargin=*]
+    \item TLS/SSL operates at this layer (though sometimes considered Layer 5)
+    \item Provides encryption and integrity protection for data in transit
+    \item Certificate-based authentication is distinct from application-layer signature verification
+\end{itemize}
+
+\textbf{Network Realities:}
+Actual Internet traffic traverses infrastructure owned by ISPs, backbone providers, and data center operators \citep{gill2015}. While peer-to-peer overlay networks can be constructed at higher layers, the underlying transport relies on shared Internet infrastructure subject to standard routing policies and potential blocking.
+
+\subsection{Layer 3: Network Layer}
+
+\textbf{Technical Function:} Handles logical addressing and routing between networks.
+
+\textbf{Routing Infrastructure:}
+\begin{itemize}[leftmargin=*]
+    \item The Internet uses BGP (Border Gateway Protocol) for inter-domain routing
+    \item Routing decisions are made by autonomous systems based on policy and connectivity
+    \item Centralized elements include DNS root servers and RIR-managed IP allocations
+\end{itemize}
+
+\textbf{Distributed Overlay Networks:}
+Peer-to-peer networks can implement application-layer routing that operates independently of underlying network topology. Examples include Kademlia DHT (Distributed Hash Table) routing \citep{maymounkov2002}. However, all overlay traffic ultimately traverses the underlying physical network infrastructure.
+
+\subsection{Layer 2: Data Link Layer}
+
+\textbf{Technical Function:} Manages frame delivery between adjacent nodes on the same network segment.
+
+\textbf{Link Security:}
+\begin{itemize}[leftmargin=*]
+    \item Wi-Fi uses WPA2/WPA3 for encryption
+    \item Ethernet switches operate at this layer
+    \item VPN tunnels can encrypt link-level traffic
+\end{itemize}
+
+\textbf{Physical Reality:}
+Data link connections require physical infrastructure (cables, radio spectrum, switching equipment) operated by entities with legal and technical control over that infrastructure.
+
+\subsection{Layer 1: Physical Layer}
+
+\textbf{Technical Function:} Transmission of raw bits over physical media.
+
+\textbf{Infrastructure:}
+The physical layer comprises cables, fiber optics, radio spectrum, and transmission equipment. This infrastructure is owned and operated by telecommunications companies, governments, and private entities with legal jurisdiction over their territories.
+
+\textbf{Resilience Considerations:}
+While distributed network topologies can provide fault tolerance, no network can operate independently of physical infrastructure. Claims of infrastructure that ``cannot be seized or shut down'' are not technically accurate---physical equipment remains subject to legal and technical control by infrastructure owners and authorities with jurisdiction.
+
+\section{Security Analysis}
+
+\subsection{Threat Model}
+
+Authentication systems face threats at multiple layers:
+
+\begin{table}[h]
+\centering
+\caption{Layer-specific security considerations}
+\begin{tabular}{@{}cll@{}}
+\toprule
+\textbf{Layer} & \textbf{Threat} & \textbf{Mitigation} \\
+\midrule
+7 & Implementation bugs & Formal verification, audits \\
+6 & Encoding attacks & Strict canonicalization \\
+5 & Session hijacking & Secure token generation \\
+4 & Man-in-the-middle & TLS, certificate pinning \\
+3 & Routing attacks & BGPsec (limited deployment) \\
+2 & Eavesdropping & Link encryption \\
+1 & Physical interception & Tamper detection \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Decentralization: A Critical Examination}
+
+The term ``decentralization'' requires precise definition. In distributed systems literature, decentralization typically refers to:
+
+\begin{enumerate}
+    \item \textbf{Architectural decentralization:} Number of physical machines in the system
+    \item \textbf{Political decentralization:} Number of individuals/organizations controlling those machines
+    \item \textbf{Logical decentralization:} Interface and data structure design \citep{buterin2017}
+\end{enumerate}
+
+\textbf{Technical Reality:}
+\begin{itemize}[leftmargin=*]
+    \item Lower OSI layers (1--3) involve infrastructure that cannot be fully decentralized in the political sense
+    \item Physical cables, spectrum licenses, and backbone networks are controlled by identifiable entities
+    \item Overlay networks can provide architectural decentralization but remain dependent on underlying infrastructure
+\end{itemize}
+
+\textbf{Censorship Resistance:}
+While distributed overlay networks can provide resilience against single points of failure, no network is fully censorship-resistant. Authorities with jurisdiction over physical infrastructure can implement blocking at layers 1--4, and application-layer systems may be subject to legal requirements in relevant jurisdictions \citep{clayton2006}.
+
+\section{Related Work}
+
+\subsection{Blockchain and Distributed Consensus}
+
+Bitcoin's proof-of-work consensus demonstrated a mechanism for distributed agreement without central coordination \citep{nakamoto2008}. However, blockchain networks operate at the application layer, relying on underlying Internet infrastructure for communication.
+
+\subsection{Peer-to-Peer Overlay Networks}
+
+Systems such as BitTorrent, Tor, and various DHT implementations demonstrate distributed routing at the application layer \citep{maymounkov2002, dingledine2004}. These provide resilience but remain subject to the limitations of underlying network infrastructure.
+
+\subsection{Authentication Protocols}
+
+UProve, Idemix, and other zero-knowledge authentication systems provide cryptographic privacy guarantees \citep{camenisch2001}. Challenge-response signature verification represents a simpler approach with fewer privacy features but lower complexity.
+
+\section{Discussion}
+
+\subsection{The Separation of Concerns}
+
+A rigorous analysis reveals a separation between:
+\begin{itemize}[leftmargin=*]
+    \item \textbf{Cryptographic procedures} (Layer 7): Deterministic, mathematically verifiable
+    \item \textbf{Network infrastructure} (Layers 1--4): Subject to physical and legal realities
+\end{itemize}
+
+The mathematical correctness of signature verification does not imply properties about the underlying network infrastructure.
+
+\subsection{Evaluation of Claims}
+
+Several common claims in distributed systems marketing warrant critical examination:
+
+\begin{table}[h]
+\centering
+\caption{Critical evaluation of common claims}
+\begin{tabular}{@{}lp{8cm}@{}}
+\toprule
+\textbf{Claim} & \textbf{Assessment} \\
+\midrule
+``Fully decentralized at all layers'' & Not technically accurate for layers 1--3 \\
+``Cannot be shut down'' & Contradicted by physical infrastructure realities \\
+``No capture point anywhere'' & Overstated; various single points of failure exist \\
+``Mathematical bedrock'' & Accurate for cryptographic verification itself \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Practical Implications}
+
+For practitioners implementing distributed authentication:
+
+\begin{enumerate}
+    \item \textbf{Cryptographic correctness} is necessary but not sufficient for system security
+    \item \textbf{Infrastructure dependencies} must be acknowledged in threat modeling
+    \item \textbf{Legal and jurisdictional} considerations apply regardless of technical architecture
+    \item \textbf{Usability challenges} (key management, recovery) often dominate security outcomes
+\end{enumerate}
+
+\section{Case Study: Age Verification and Centralized Digital Identity Systems}
+
+\subsection{Technical Implementation Trends}
+
+Recent legislative developments in multiple jurisdictions mandate age verification for access to online services \citep{uk2023, france2023}. These requirements are driving technical implementations that embed identity verification directly into operating systems and network infrastructure.
+
+\textbf{Current Implementation Trajectory:}
+
+Operating system vendors are developing APIs that enable applications to query the OS for user age attributes. This architecture creates a direct channel between:
+\begin{itemize}[leftmargin=*]
+    \item Government-issued digital identity credentials
+    \item Operating system kernel-level functions
+    \item Third-party application access controls
+\end{itemize}
+
+The technical progression follows a predictable path:
+
+\begin{enumerate}
+    \item \textbf{Application-layer verification:} Websites request ID document uploads
+    \item \textbf{OS-integrated verification:} System APIs provide age attestation to applications
+    \item \textbf{Network-layer enforcement:} ISPs block traffic based on age classification
+    \item \textbf{Hardware-bound identity:} Trusted Platform Modules (TPMs) enforce identity linkage
+\end{enumerate}
+
+\subsection{Architectural Characteristics of Centralized Verification}
+
+The integration of identity verification into lower OSI layers enables comprehensive data correlation:
+
+\textbf{Data Aggregation:}
+When age verification operates through centralized identity providers, every access request generates a log entry linking:
+\begin{itemize}[leftmargin=*]
+    \item User identity (or pseudonymous identifier)
+    \item Content category accessed
+    \item Timestamp and network location
+    \item Device fingerprint
+\end{itemize}
+
+This data aggregation enables reconstruction of comprehensive behavioral profiles.
+
+\textbf{Scope Expansion:}
+Systems deployed for age verification have historically expanded to other use cases. Infrastructure constructed for initial purposes (e.g., copyright enforcement, security screening) has routinely been repurposed for additional monitoring functions \citep{landau2011}.
+
+\textbf{Access Limitations:}
+Mandatory digital identity systems exclude individuals without government-recognized credentials, including undocumented persons, those in jurisdictions with limited identity infrastructure, and individuals facing bureaucratic barriers to obtaining documentation \citep{gelb2015}.
+
+\subsection{The Technical Alternative: Privacy-Preserving Attribute Verification}
+
+The cryptographic authentication procedures examined in this paper offer a technically superior alternative that preserves privacy while achieving regulatory objectives.
+
+\textbf{Zero-Knowledge Age Verification:}
+Rather than transmitting identity documents or linking user identity to service access, cryptographic systems can prove age attributes without revealing underlying identity:
+
+\begin{enumerate}
+    \item A credential issuer (e.g., government) signs an age attribute attestation
+    \item The user presents a zero-knowledge proof demonstrating age $\geq$ threshold
+    \item The service verifies the proof without learning the user's identity or exact age
+    \item No persistent linkage exists between identity and service access
+\end{enumerate}
+
+\textbf{Distributed Implementation:}
+The architecture described in Sections 3--4 enables this verification without centralized intermediaries:
+\begin{itemize}[leftmargin=*]
+    \item No single entity possesses both identity and access logs
+    \item No central database of user activities exists
+    \item Verification occurs through mathematical proof rather than institutional trust
+\end{itemize}
+
+\subsection{Policy Implications}
+
+The technical choice between centralized and privacy-preserving verification has profound policy consequences:
+
+\begin{table}[h]
+\centering
+\caption{Comparison of age verification architectures}
+\begin{tabular}{@{}lcccc@{}}
+\toprule
+\textbf{Approach} & \textbf{Privacy} & \textbf{Monitoring} & \textbf{Access} & \textbf{Complexity} \\
+ & & \textbf{Potential} & \textbf{Limitations} & \\
+\midrule
+Centralized ID upload & None & High & Low & Low \\
+OS-integrated verification & Minimal & Moderate & Medium & Medium \\
+Third-party age tokens & Limited & Moderate & Medium & Medium \\
+Zero-knowledge credentials & Strong & Minimal & Medium & Higher \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The centralized approaches described in current regulatory frameworks differ from privacy-preserving alternatives in their data retention properties. Technical analysis indicates that systems retaining identity-to-access logs create persistent records, while zero-knowledge approaches achieve the stated regulatory objective without such retention.
+
+\subsection{Technical Recommendations}
+
+For policymakers and system architects:
+
+\begin{enumerate}
+    \item \textbf{Mandate privacy-preserving verification:} Regulations should explicitly require that age verification systems do not create persistent records linking identity to access patterns.
+    \item \textbf{Prohibit OS-level identity integration:} Operating system APIs that expose identity attributes to applications create systemic data collection capabilities that exceed governance boundaries.
+    \item \textbf{Support open standards:} Zero-knowledge credential systems (e.g., BBS+ signatures, Idemix) should receive regulatory recognition equivalent to centralized identity verification \citep{tetelman2023}.
+    \item \textbf{Require data minimization:} Age verification should reveal only the boolean result (over/under threshold), not identity, exact age, or location data.
+\end{enumerate}
+
+\subsection{The Asymmetry of Technical Reality}
+
+There exists a fundamental asymmetry between policy ambition and technical implementation. Legislative frameworks may prescribe comprehensive monitoring systems, but the mathematical properties of cryptographic systems establish hard boundaries on what is technically achievable.
+
+\textbf{The Enforcement Hierarchy:}
+
+At the lowest level of the technical stack, physical and mathematical constraints enforce themselves regardless of policy intent. A digital signature either validates against a public key or it does not---no regulatory framework can compel a different mathematical outcome. Similarly, a zero-knowledge proof either demonstrates possession of an attribute without revealing identity, or the verification fails. The mathematics admits no exceptions, no backdoors subject to administrative procedures, no override mechanisms for special cases.
+
+This creates an enforcement hierarchy that operates independently of institutional authority:
+
+\begin{enumerate}
+    \item \textbf{Mathematical enforcement} (Layer 7): Cryptographic verification succeeds or fails deterministically
+    \item \textbf{Physical enforcement} (Layer 1): Bits transmit according to physical laws, not policy documents
+    \item \textbf{Institutional enforcement} (Policy layer): Regulatory frameworks operate as terms of service---binding only on those who choose to participate within a jurisdiction
+\end{enumerate}
+
+\textbf{Implications for System Architecture:}
+
+Policy documents can declare observability objectives, but they cannot compel the mathematics to cooperate. When a system is constructed atop cryptographic primitives that mathematically prevent identity linkage, the architecture itself becomes the enforcement mechanism---not courts, not administrative agencies, not terms of service agreements that users affirmatively disregard.
+
+The technical reality is that distributed cryptographic systems establish a bedrock layer beneath which institutional control cannot penetrate. This is not a matter of legal interpretation or regulatory jurisdiction. It is a property of information theory, of computation, of mathematical proof.
+
+Legislative frameworks may aspire to comprehensive digital identity systems. Technical reality determines what is possible. The gap between aspiration and possibility is not filled by enforcement mechanisms---it is simply the space where policy documents become inoperative, where declared intentions encounter mathematical bedrock, where the fundamental nature of information itself imposes constraints that no regulatory text can override.
+
+In this context, the choice of technical architecture is determinative. Systems built on centralized intermediaries remain subject to institutional control. Systems built on cryptographic proof remain subject only to mathematical law. The difference is not one of policy preference but of fundamental enforceability.
+
+\section{Conclusion}
+
+This paper has examined the interaction between cryptographic authentication procedures and network architecture across OSI model layers. Key findings include:
+
+\begin{enumerate}
+    \item Digital signature verification operates as a deterministic mathematical procedure at the application layer (Layer 7).
+    \item Claims of ``decentralization at every layer'' conflate overlay network topology with physical infrastructure realities. Layers 1--3 involve infrastructure subject to standard legal and technical controls.
+    \item The mathematical properties of cryptographic primitives do not extend to claims about network infrastructure resilience.
+    \item Practical security depends on implementation quality, key management, threat modeling, and acknowledgment of infrastructure dependencies---not solely on cryptographic correctness.
+    \item The case study of age verification systems demonstrates that centralized digital identity infrastructure creates systemic surveillance risks. Privacy-preserving cryptographic alternatives can achieve regulatory objectives without constructing permanent surveillance apparatus.
+\end{enumerate}
+
+Future work should focus on rigorous threat modeling for distributed authentication systems, realistic evaluation of censorship resistance, improved usability for cryptographic key management, and recognition that technical architecture---not policy declaration---ultimately determines the boundaries of surveillance capability.
+
+\vspace{1cm}
+\noindent\rule{\textwidth}{0.4pt}
+
+\section*{Author Information}
+\addcontentsline{toc}{section}{Author Information}
+
+\noindent
+This paper presents an independent technical analysis of distributed authentication architecture. The views expressed are based on established computer science literature and do not endorse any specific commercial implementation.
+
+\vspace{0.5cm}
+\noindent
+\textit{Document version: 1.2}\\
+\textit{Date: April 2026}
+
+\begin{thebibliography}{99}
+
+\bibitem[ISO(1994)]{iso1994}
+International Organization for Standardization.
+\newblock ISO/IEC 7498-1:1994, Information technology --- Open Systems Interconnection --- Basic Reference Model: The Basic Model.
+\newblock 1994.
+
+\bibitem[Cerf \& Kahn(1974)]{cerf1974}
+Cerf, V., \& Kahn, R.
+\newblock A protocol for packet network intercommunication.
+\newblock \emph{IEEE Transactions on Communications}, 22(5), 637--648, 1974.
+
+\bibitem[Diffie \& Hellman(1976)]{diffie1976}
+Diffie, W., \& Hellman, M.
+\newblock New directions in cryptography.
+\newblock \emph{IEEE Transactions on Information Theory}, 22(6), 644--654, 1976.
+
+\bibitem[NIST(2023)]{nist2023}
+National Institute of Standards and Technology.
+\newblock FIPS 186-5: Digital Signature Standard (DSS).
+\newblock 2023.
+
+\bibitem[Josefsson \& Liusvaara(2017)]{rfc8032}
+Josefsson, S., \& Liusvaara, I.
+\newblock RFC 8032: Edwards-Curve Digital Signature Algorithm (EdDSA).
+\newblock IETF, 2017.
+
+\bibitem[Fielding \& Reschke(2014)]{rfc7230}
+Fielding, R., \& Reschke, J.
+\newblock RFC 7230: Hypertext Transfer Protocol (HTTP/1.1): Message Syntax and Routing.
+\newblock IETF, 2014.
+
+\bibitem[Gill et~al.(2015)]{gill2015}
+Gill, P., et~al.
+\newblock Characterizing cryptic censorship in the DNS infrastructure.
+\newblock \emph{ACM SIGCOMM Computer Communication Review}, 44(4), 323--328, 2015.
+
+\bibitem[Maymounkov \& Mazi\`{e}res(2002)]{maymounkov2002}
+Maymounkov, P., \& Mazi\`{e}res, D.
+\newblock Kademlia: A peer-to-peer information system based on the XOR metric.
+\newblock \emph{International Workshop on Peer-to-Peer Systems}, 53--65, 2002.
+
+\bibitem[Buterin(2017)]{buterin2017}
+Buterin, V.
+\newblock The meaning of decentralization.
+\newblock \emph{Medium}, 2017.
+\newblock \url{https://medium.com/@VitalikButerin/the-meaning-of-decentralization-a0c92b76a274}
+
+\bibitem[Clayton et~al.(2006)]{clayton2006}
+Clayton, R., Murdoch, S.~J., \& Watson, R.~N.~M.
+\newblock Ignoring the great firewall of China.
+\newblock \emph{Privacy Enhancing Technologies}, 20--35, 2006.
+
+\bibitem[Nakamoto(2008)]{nakamoto2008}
+Nakamoto, S.
+\newblock Bitcoin: A peer-to-peer electronic cash system.
+\newblock Whitepaper, 2008.
+
+\bibitem[Dingledine et~al.(2004)]{dingledine2004}
+Dingledine, R., Mathewson, N., \& Syverson, P.
+\newblock Tor: The second-generation onion router.
+\newblock \emph{USENIX Security Symposium}, 303--320, 2004.
+
+\bibitem[Camenisch \& Lysyanskaya(2001)]{camenisch2001}
+Camenisch, J., \& Lysyanskaya, A.
+\newblock An efficient system for non-transferable anonymous credentials with optional anonymity revocation.
+\newblock \emph{EUROCRYPT}, 93--118, 2001.
+
+\bibitem[UK(2023)]{uk2023}
+UK Department for Science, Innovation and Technology.
+\newblock Online Safety Bill.
+\newblock UK Parliament, 2023.
+
+\bibitem[France(2023)]{france2023}
+French Republic.
+\newblock Loi visant \`{a} s\'{e}curiser et r\'{e}guler l'espace num\'{e}rique (SREN).
+\newblock Journal Officiel, 2023.
+
+\bibitem[Landau(2011)]{landau2011}
+Landau, S.
+\newblock Surveillance or security? The risks posed by new wiretapping technologies.
+\newblock MIT Press, 2011.
+
+\bibitem[Gelb \& Diofasi(2015)]{gelb2015}
+Gelb, A., \& Diofasi, A.
+\newblock The political economy of identification: Toward a shared understanding.
+\newblock Center for Global Development Working Paper, 2015.
+
+\bibitem[Tetelman et~al.(2023)]{tetelman2023}
+Tetelman, A., et~al.
+\newblock BBS+ signatures and privacy-preserving credentials.
+\newblock IETF Draft, 2023.
+
+\end{thebibliography}
+
+\end{document}

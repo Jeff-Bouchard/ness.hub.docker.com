@@ -172,7 +172,7 @@ select_profile() {
   echo -e "${green}Select Deployment Profile:${reset}"
   echo "  1) Pi 3 Essentials (Emercoin, Privateness, DNS, Skywire, Tools)"
   echo "  2) Skyminer (Emercoin, Privateness, DNS, Tools — no Skywire container)"
-  echo "  3) Full Node (Emercoin, Yggdrasil, I2P-Yggdrasil, Skywire, AmneziaWG, Skywire-AmneziaWG, DNS, pyuheprng, Privateness, Privatenesstools)"
+  echo "  3) Full Node (Emercoin, Yggdrasil, I2P-Yggdrasil, Skywire, DNS, pyuheprng, Privateness, Privatenesstools)"
   echo "  4) MCP Server Suite (MCP daemons, wormhole rendezvous)"
   echo "  5) MCP Client Suite (apps, QR helpers, wormhole client)"
   echo
@@ -395,8 +395,6 @@ stack_status() {
     "skywire:Skywire"
     "yggdrasil:Yggdrasil"
     "i2p-yggdrasil:I2P-Yggdrasil"
-    "amneziawg:AmneziaWG"
-    "skywire-amneziawg:Skywire-AmneziaWG"
   )
 
   local pair
@@ -452,9 +450,6 @@ build_single_image() {
     "pyuheprng-privatenesstools"
     "ipfs"
     "i2p-yggdrasil"
-    "amneziawg"
-    "skywire-amneziawg"
-    "amnezia-exit"
     "ness-unified"
   )
 
@@ -551,8 +546,7 @@ services_menu() {
     echo "  5) pyuheprng-privatenesstools"
     echo "  6) Yggdrasil"
     echo "  7) I2P-Yggdrasil"
-    echo "  8) AmneziaWG"
-    echo "  9) Skywire-AmneziaWG"
+    echo "  8) Back"
     echo "  0) Back"
     echo
     read -rp "Select service: " choice
@@ -564,9 +558,7 @@ services_menu() {
       5) service_control_menu "pyuheprng-privatenesstools" "pyuheprng-privatenesstools" ;;
       6) service_control_menu "yggdrasil" "Yggdrasil" ;;
       7) service_control_menu "i2p-yggdrasil" "I2P-Yggdrasil" ;;
-      8) service_control_menu "amneziawg" "AmneziaWG" ;;
-      9) service_control_menu "skywire-amneziawg" "Skywire-AmneziaWG" ;;
-      0) return 0 ;;
+      8|0) return 0 ;;
       *) echo "Invalid choice." ;;
     esac
   done

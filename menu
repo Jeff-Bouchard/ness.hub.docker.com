@@ -1,33 +1,47 @@
 #!/bin/bash
-# NESS Hub Menu - Podman/Docker Stack Manager
+# NESS Hub Menu v2.1 - Podman/Docker Stack Manager
+# Checkpoint: 2026-04-07 - Mobile-ready, service tiers, individual controls
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" 2>/dev/null && pwd || echo ".")"
 cd "$SCRIPT_DIR" 2>/dev/null || true
 
+VERSION="v2.1"
+
 # Auto-detect container engine
-if command -v podman-compose &>/dev/null && podman info &>/dev/null; then
+if command -v podman-compose &>/dev/null && podman info &>/dev/null 2>&1; then
+    # Prefer podman-compose to avoid podman compose delegating to docker-compose
     ENGINE="podman-compose"
     RUNTIME="podman"
-else
+elif command -v podman &>/dev/null && podman info &>/dev/null 2>&1 && podman compose version &>/dev/null 2>&1; then
+    ENGINE="podman compose"
+    RUNTIME="podman"
+elif command -v docker-compose &>/dev/null && docker info &>/dev/null 2>&1; then
     ENGINE="docker-compose"
     RUNTIME="docker"
+elif command -v docker &>/dev/null && docker info &>/dev/null 2>&1; then
+    ENGINE="docker compose"
+    RUNTIME="docker"
+else
+    echo "Warning: No container engine detected (podman or docker)"
+    ENGINE="podman compose"
+    RUNTIME="podman"
 fi
 
+RESEED_INTERVAL="${RESEED_INTERVAL:-}"
 PROFILE="${PROFILE:-pi3}"
+SSH_GATEWAY_PORT="${SSH_GATEWAY_PORT:-2222}"
+
+# Colors
 R=$'\033[0m'
 G=$'\033[32m'
 Y=$'\033[33m'
 C=$'\033[36m'
 B=$'\033[1m'
 
-get_services() {
-    case "$PROFILE" in
-        pi3) echo "emercoin-core privateness skywire dns-reverse-proxy pyuheprng-privatenesstools" ;;
-        skyminer) echo "emercoin-core privateness dns-reverse-proxy pyuheprng-privatenesstools" ;;
-        full) echo "emercoin-core yggdrasil i2p-yggdrasil skywire privateness dns-reverse-proxy pyuheprng-privatenesstools" ;;
-        *) echo "emercoin-core privateness" ;;
-    esac
-}
+# Service Tiers
+TIER1="emercoin-core privateness skywire pyuheprng-privatenesstools ssh-gateway"  # Always run
+TIER2="yggdrasil i2p-yggdrasil softether-vpn"                         # Secondary
+TIER3="dns-reverse-proxy"                                             # Third
 
 check_status() {
     if $RUNTIME ps --filter "name=$1" --format '{{.Status}}' 2>/dev/null | grep -q "Up"; then
@@ -37,51 +51,230 @@ check_status() {
     fi
 }
 
+ensure_key_dir() {
+    local dir="$1"
+    [ -z "$dir" ] && return 0
+    mkdir -p "$dir" 2>/dev/null || true
+}
+
+generate_ssh_admin_env() {
+    local env_file="${SCRIPT_DIR}/.ssh-admin.env"
+    if [ -s "$env_file" ]; then
+        return 0
+    fi
+
+    local password
+    if command -v openssl >/dev/null 2>&1; then
+        password=$(openssl rand -base64 18 | tr -d '\n')
+    else
+        password=$(head -c 24 /dev/urandom | base64 | tr -d '\n')
+    fi
+
+    cat >"$env_file" <<EOF
+PASSWORD=${password}
+USER_NAME=root
+EOF
+
+    local key_dir linux_key_file win_key_file
+    key_dir="${HOME:-/root}/.privateness-keys"
+    ensure_key_dir "$key_dir"
+    linux_key_file="${key_dir}/ssh-gateway-admin.txt"
+    cat >"$linux_key_file" <<EOF
+username=root
+password=${password}
+generated_at=$(date -Iseconds)
+port=${SSH_GATEWAY_PORT}
+EOF
+    chmod 600 "$linux_key_file" 2>/dev/null || true
+
+    if [ -n "${USERPROFILE:-}" ]; then
+        local win_dir="${USERPROFILE}\\.privateness-keys"
+        ensure_key_dir "$win_dir"
+        win_key_file="${win_dir}\\ssh-gateway-admin.txt"
+        printf "username=root\npassword=%s\nport=%s\n" "$password" "$SSH_GATEWAY_PORT" > "$win_key_file" 2>/dev/null || true
+    fi
+
+    echo "${G}✓ Generated SSH admin credentials (stored in .ssh-admin.env and ~/.privateness-keys)${R}"
+}
+
+apply_firewall_rules() {
+    if [ "${ENABLE_FIREWALL:-true}" != "true" ]; then
+        return 0
+    fi
+    if ! command -v iptables >/dev/null 2>&1; then
+        echo "${Y}Firewall skipped (iptables not available)${R}"
+        return 0
+    fi
+
+    local chain="NESS_STACK"
+    iptables -N "$chain" 2>/dev/null || iptables -F "$chain"
+    iptables -A "$chain" -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
+    iptables -A "$chain" -i lo -j ACCEPT
+    iptables -A "$chain" -p tcp --dport "$SSH_GATEWAY_PORT" -j ACCEPT
+    iptables -A "$chain" -p tcp --dport "${SKYWIRE_PORT:-8000}" -j ACCEPT
+    iptables -A "$chain" -p tcp --dport 80 -j ACCEPT
+    iptables -A "$chain" -p tcp --dport 443 -j ACCEPT
+    iptables -A "$chain" -j DROP
+
+    iptables -D INPUT -j "$chain" 2>/dev/null || true
+    iptables -I INPUT 1 -j "$chain"
+    echo "${G}✓ Firewall applied: only SSH gateway + dashboards open${R}"
+}
+
+remove_firewall_rules() {
+    if ! command -v iptables >/dev/null 2>&1; then
+        return 0
+    fi
+    local chain="NESS_STACK"
+    iptables -D INPUT -j "$chain" 2>/dev/null || true
+    iptables -F "$chain" 2>/dev/null || true
+    iptables -X "$chain" 2>/dev/null || true
+}
+
 show_menu() {
     clear
-    echo "${B}${C}=== NESS Hub Stack Manager ===${R}"
-    printf "Profile: ${B}%-10s${R} Engine: ${B}%-7s${R}\n" "$PROFILE" "$RUNTIME"
+    echo "${B}${C}╔══════════════════════════════════════╗${R}"
+    echo "${B}${C}║${R}     ${B}NESS Hub Menu ${VERSION}${R}           ${C}║${R}"
+    echo "${B}${C}╠══════════════════════════════════════╣${R}"
+    printf "${C}║${R}  Profile: ${B}%-10s${R} Engine: ${B}%-5s${R} ${C}║${R}\n" "$PROFILE" "$RUNTIME"
+    
+    # Show reseed status
+    if [ -n "$RESEED_INTERVAL" ]; then
+        printf "${C}║${R}  Reseed: ${B}%-3s${R}s (enabled)         ${C}║${R}\n" "$RESEED_INTERVAL"
+    else
+        printf "${C}║${R}  Reseed: disabled (opt:11)         ${C}║${R}\n"
+    fi
+    echo "${B}${C}╚══════════════════════════════════════╝${R}"
     echo
-    echo "Services:"
-    for svc in $(get_services); do
-        printf "  %s %-20s\n" "$(check_status $svc)" "$svc"
+    
+    echo "  ${B}Tier 1 (Always):${R}"
+    for svc in $TIER1; do
+        printf "  %s %-25s\n" "$(check_status $svc)" "$svc"
     done
     echo
-    echo "  ${B}[1]${R} Start      [5] Logs      [9] Profile"
-    echo "  ${B}[2]${R} Stop       [6] Health    [0] Exit"
-    echo "  ${B}[3]${R} Restart    [7] Update    [10] Build Tools"
-    echo "  ${B}[4]${R} Status     [8] Clean Up"
+    
+    if [ "$PROFILE" = "full" ]; then
+        echo "${B}Tier 2:${R}"
+        for svc in $TIER2; do
+            printf "  %s %-25s\n" "$(check_status $svc)" "$svc"
+        done
+        echo
+        echo "${B}Tier 3:${R}"
+        for svc in $TIER3; do
+            printf "  %s %-25s\n" "$(check_status $svc)" "$svc"
+        done
+        echo
+    fi
+    
+    echo "  ${B}[1]${R} Start All     [6] ${B}Health Check${R}"
+    echo "  ${B}[2]${R} Stop All      [7] ${B}Update Images${R}"
+    echo "  ${B}[3]${R} Restart All   [8] ${B}Clean System${R}"
+    echo "  ${B}[4]${R} View Status   [9] ${B}Set Profile${R}"
+    echo "  ${B}[5]${R} View Logs     [10] ${B}Build Tools${R}"
+    echo "  ${B}[11]${R} Set Reseed   [12] ${B}Per-Container${R}"
+    echo "  ${B}[0]${R} Exit"
     echo
 }
 
 cleanup() {
-    for svc in emercoin-core privateness skywire dns-reverse-proxy pyuheprng-privatenesstools yggdrasil i2p-yggdrasil; do
+    for svc in emercoin-core privateness skywire dns-reverse-proxy pyuheprng-privatenesstools ssh-gateway yggdrasil i2p-yggdrasil softether-vpn; do
         $RUNTIME stop $svc &>/dev/null || true
         $RUNTIME rm -f $svc &>/dev/null || true
     done
     $ENGINE down &>/dev/null || true
 }
 
+container_menu() {
+    while true; do
+        clear
+        echo "${B}${C}=== Individual Container Control ===${R}"
+        echo
+        local i=1
+        for svc in $TIER1 $TIER2 $TIER3; do
+            local status="$($RUNTIME ps --filter "name=$svc" --format '{{.Status}}' 2>/dev/null | head -1)"
+            [ -z "$status" ] && status="stopped"
+            printf "  ${B}[%d]${R} %-25s %s\n" "$i" "$svc" "$status"
+            i=$((i+1))
+        done
+        echo
+        echo "  ${B}[s]${R} Start selected  [S] Stop selected"
+        echo "  ${B}[r]${R} Restart selected  [c] Cleanup selected"
+        echo "  ${B}[l]${R} Logs selected     [0] Back"
+        echo
+        read -rp "Select: " c
+        
+        case "$c" in
+            0) return ;;
+            [1-9])
+                local selected=$(echo "$TIER1 $TIER2 $TIER3" | cut -d' ' -f$c)
+                [ -z "$selected" ] && continue
+                read -rp "Action for $selected [start/stop/restart/logs/cleanup]: " action
+                case "$action" in
+                    start) $RUNTIME start $selected 2>/dev/null || $ENGINE up -d $selected ;;
+                    stop) $RUNTIME stop $selected 2>/dev/null && $RUNTIME rm -f $selected ;;
+                    restart) $RUNTIME restart $selected 2>/dev/null || { $RUNTIME stop $selected; $RUNTIME start $selected; } ;;
+                    logs) $RUNTIME logs -f --tail=50 $selected ;;
+                    cleanup) $RUNTIME stop $selected; $RUNTIME rm -f $selected ;;
+                esac
+                ;;
+        esac
+        read -rp "Press Enter..."
+    done
+}
+
 do_start() {
-    echo "${C}Starting...${R}"
-    cleanup
-    sleep 1
-    if [ "$PROFILE" = "pi3" ] || [ "$PROFILE" = "skyminer" ]; then
+    echo "${C}Starting NESS stack (Tier 1 first)...${R}"
+
+    generate_ssh_admin_env
+    
+    # Ensure persistent volumes exist
+    $RUNTIME volume create emercoin-data 2>/dev/null || true
+    $RUNTIME volume create skywire-data 2>/dev/null || true
+    
+    # Tier 1: Core services always first
+    echo "  → Tier 1: Core services..."
+    for svc in emercoin-core; do
+        echo "    Starting $svc..."
         $RUNTIME run -d --replace --name emercoin-core -p 6661:6661 -p 6662:6662 \
             -v emercoin-data:/data nessnetwork/emercoin-core:latest &>/dev/null || \
             $ENGINE up -d emercoin-core 2>/dev/null || true
-        sleep 3
-        local others=$(get_services | sed 's/emercoin-core //')
-        $ENGINE up -d $others 2>/dev/null || true
-    else
-        $ENGINE up -d 2>/dev/null || true
+    done
+    sleep 3
+    
+    # Start remaining Tier 1
+    local tier1_rest="privateness skywire pyuheprng-privatenesstools ssh-gateway"
+    if [ -n "$RESEED_INTERVAL" ]; then
+        echo "    Starting pyuheprng-privatenesstools with ${RESEED_INTERVAL}s reseeding..."
+        $RUNTIME run -d --replace --name pyuheprng-privatenesstools \
+            -p 5000:5000 -p 8888:8888 \
+            -e RESEED_INTERVAL="$RESEED_INTERVAL" \
+            nessnetwork/pyuheprng-privatenesstools:latest 2>/dev/null || \
+            $ENGINE up -d pyuheprng-privatenesstools 2>/dev/null || true
+        tier1_rest="privateness skywire"
     fi
+    
+    for svc in $tier1_rest; do
+        echo "    Starting $svc..."
+        $ENGINE up -d $svc 2>/dev/null || true
+    done
+    
+    # Tier 2 & 3 only for full profile
+    if [ "$PROFILE" = "full" ]; then
+        echo "  → Tier 2: Yggdrasil, I2P, SoftEther..."
+        $ENGINE up -d yggdrasil i2p-yggdrasil softether-vpn 2>/dev/null || true
+        echo "  → Tier 3: DNS..."
+        $ENGINE up -d dns-reverse-proxy 2>/dev/null || true
+    fi
+    
     echo "${G}✓ Started${R}"
+    echo "  ${C}Emercoin blockchain: persistent volume${R}"
+    apply_firewall_rules
     sleep 1
 }
 
 do_stop() {
-    echo "${C}Stopping...${R}"
+    echo "${C}Stopping stack...${R}"
+    remove_firewall_rules
     cleanup
     echo "${G}✓ Stopped${R}"
     sleep 1
@@ -90,8 +283,8 @@ do_stop() {
 do_restart() { do_stop; sleep 2; do_start; }
 
 do_status() {
-    echo "${C}Status:${R}"
-    $ENGINE ps 2>/dev/null || echo "No containers"
+    echo "${C}Container Status:${R}"
+    $ENGINE ps 2>/dev/null || echo "No running containers"
 }
 
 do_logs() {
@@ -101,7 +294,7 @@ do_logs() {
 
 do_health() {
     echo "${C}Health Check:${R}"
-    for port in 6661 6662 6660 5000 8053 8000; do
+    for port in 6661 6662 6660 5000 8888 8053 8000 ${SSH_GATEWAY_PORT} ${SOFTETHER_VPN_PORT:-443}; do
         if nc -z 127.0.0.1 $port 2>/dev/null; then
             printf "  ${G}✓${R} Port %s: open\n" "$port"
         else
@@ -111,68 +304,73 @@ do_health() {
 }
 
 do_pull() {
-    echo "${C}Pulling images...${R}"
+    echo "${C}Pulling latest images...${R}"
     $ENGINE pull 2>/dev/null || echo "Done"
 }
 
 do_cleanup() {
-    echo "${C}Cleaning up...${R}"
+    echo "${C}Cleaning up system...${R}"
     $RUNTIME container prune -f 2>/dev/null || true
     $RUNTIME image prune -f 2>/dev/null || true
+    $RUNTIME volume prune -f 2>/dev/null || true
     echo "${G}✓ Cleaned${R}"
 }
 
 do_profile() {
-    read -rp "Profile [pi3/skyminer/full]: " p
-    case "$p" in pi3|skyminer|full) PROFILE="$p"; echo "Set to: $PROFILE" ;; esac
+    echo "  ${B}Profiles:${R}"
+    echo "    pi3      - Tier 1 only (lightweight)"
+    echo "    skyminer - Tier 1 without Skywire"
+    echo "    full     - All tiers (heavyweight)"
+    echo
+    read -rp "Select [pi3/skyminer/full]: " p
+    case "$p" in pi3|skyminer|full) PROFILE="$p"; echo "Set to: $PROFILE" ;; *) echo "Invalid" ;; esac
     sleep 1
 }
 
-do_build_tools() {
-    local REPO="github.com/ness-network/privatenesstools"
-    local SRC_DIR="privatenesstools-src"
-    
-    echo "${C}Building privatenesstools from source...${R}"
-    echo "  Repo: $REPO"
-    
-    # Clone if not exists
-    if [ ! -d "$SRC_DIR/.git" ]; then
-        echo "  → Cloning repository..."
-        rm -rf "$SRC_DIR" 2>/dev/null || true
-        git clone "https://${REPO}.git" "$SRC_DIR" || {
-            echo "${Y}Failed to clone. Check internet connection.${R}"
-            return 1
-        }
+do_set_reseed() {
+    echo "${C}PyUHEPRNG Reseeding:${R}"
+    echo "  Reseeding regenerates entropy periodically"
+    echo "  Default: disabled (manual reseed only)"
+    echo
+    if [ -n "$RESEED_INTERVAL" ]; then
+        echo "  Currently: ${B}${RESEED_INTERVAL}s${R}"
+        read -rp "Disable? [y/N]: " disable
+        if [[ "$disable" =~ ^[Yy]$ ]]; then
+            RESEED_INTERVAL=""
+            echo "${Y}✓ Disabled${R}"
+        fi
     else
-        echo "  → Updating existing clone..."
-        cd "$SRC_DIR" && git pull && cd ..
-    fi
-    
-    # Check for pyuheprng
-    if [ -f "$SRC_DIR/pyuheprng/pyuheprng.py" ] || [ -d "$SRC_DIR/pyuheprng" ]; then
-        echo "${G}✓ pyuheprng found in repository${R}"
-    else
-        echo "${Y}⚠ pyuheprng not found in expected location${R}"
-    fi
-    
-    # Build with podman/docker
-    if [ -f "$SRC_DIR/Dockerfile" ]; then
-        echo "  → Building container image..."
-        $RUNTIME build -t nessnetwork/pyuheprng-privatenesstools:latest "$SRC_DIR" || {
-            echo "${Y}Build failed${R}"
-            return 1
-        }
-        echo "${G}✓ Built nessnetwork/pyuheprng-privatenesstools:latest${R}"
-    else
-        echo "${Y}No Dockerfile found - using local pyuheprng-privatenesstools/ folder${R}"
-        if [ -f "pyuheprng-privatenesstools/Dockerfile" ]; then
-            $RUNTIME build -t nessnetwork/pyuheprng-privatenesstools:latest pyuheprng-privatenesstools/
-            echo "${G}✓ Built from local source${R}"
+        echo "  Currently: ${B}disabled${R}"
+        read -rp "Enable? Enter seconds (10-300, or N to cancel): " seconds
+        if [[ "$seconds" =~ ^[0-9]+$ ]] && [ "$seconds" -ge 10 ] && [ "$seconds" -le 300 ]; then
+            RESEED_INTERVAL="$seconds"
+            export RESEED_INTERVAL
+            echo "${G}✓ Enabled: ${RESEED_INTERVAL}s${R}"
+            echo "  ${C}Takes effect on next Start/Restart${R}"
+        else
+            echo "${Y}Cancelled or invalid${R}"
         fi
     fi
-    
+    sleep 2
+}
+
+do_build_tools() {
+    echo "${C}Building from github.com/ness-network/privatenesstools...${R}"
+    if [ -d "privatenesstools-src/.git" ]; then
+        cd privatenesstools-src && git pull && cd ..
+    else
+        git clone https://github.com/ness-network/privatenesstools.git privatenesstools-src || {
+            echo "${Y}Clone failed${R}"; return 1
+        }
+    fi
+    $RUNTIME build -t nessnetwork/pyuheprng-privatenesstools:latest privatenesstools-src/ 2>/dev/null || \
+    $RUNTIME build -t nessnetwork/pyuheprng-privatenesstools:latest pyuheprng-privatenesstools/
+    echo "${G}✓ Built${R}"
     sleep 1
 }
+
+# Main
+trap 'echo; exit 130' INT
 
 while true; do
     show_menu
@@ -180,7 +378,8 @@ while true; do
     case "$c" in
         1) do_start ;; 2) do_stop ;; 3) do_restart ;; 4) do_status ;;
         5) do_logs ;; 6) do_health ;; 7) do_pull ;; 8) do_cleanup ;;
-        9) do_profile ;; 10) do_build_tools ;; 0|q) exit 0 ;; *) echo "Invalid"; sleep 1 ;;
+        9) do_profile ;; 10) do_build_tools ;; 11) do_set_reseed ;;
+        12) container_menu ;; 0|q) exit 0 ;; *) echo "Invalid"; sleep 1 ;;
     esac
-    read -rp "Press Enter..."
+    [ "$c" != "0" ] && [ "$c" != "q" ] && read -rp "Press Enter..."
 done

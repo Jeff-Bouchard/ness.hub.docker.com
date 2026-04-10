@@ -387,8 +387,6 @@ stack_status() {
     "skywire:Skywire"
     "yggdrasil:Yggdrasil"
     "i2p-yggdrasil:I2P-Yggdrasil"
-    "amneziawg:AmneziaWG"
-    "skywire-amneziawg:Skywire-AmneziaWG"
   )
 
   local pair
@@ -418,8 +416,6 @@ logs_stack() {
     echo "  6) Yggdrasil"
     echo "  7) I2P-Yggdrasil"
     echo "  8) Skywire"
-    echo "  9) AmneziaWG"
-    echo " 10) Skywire-AmneziaWG"
     echo "  0) Back"
     echo
     read -rp "Select an option: " l_choice
@@ -432,8 +428,6 @@ logs_stack() {
       6) compose logs -f yggdrasil ;;
       7) compose logs -f i2p-yggdrasil ;;
       8) compose logs -f skywire ;;
-      9) compose logs -f amneziawg ;;
-      10) compose logs -f skywire-amneziawg ;;
       0) return 0 ;;
       *) echo "Invalid option." ;;
     esac
@@ -474,9 +468,6 @@ build_single_image() {
     "pyuheprng-privatenesstools"
     "ipfs"
     "i2p-yggdrasil"
-    "amneziawg"
-    "skywire-amneziawg"
-    "amnezia-exit"
     "ness-unified"
   )
 
@@ -573,11 +564,9 @@ services_menu() {
     echo "  5) pyuheprng-privatenesstools"
     echo "  6) Yggdrasil"
     echo "  7) I2P-Yggdrasil"
-    echo "  8) AmneziaWG"
-    echo "  9) Skywire-AmneziaWG"
-    echo " 10) HTCondor central manager"
-    echo " 11) HTCondor submit node"
-    echo " 12) HTCondor execute node"
+    echo "  8) HTCondor central manager"
+    echo "  9) HTCondor submit node"
+    echo " 10) HTCondor execute node"
     echo "  0) Back"
     echo
     read -rp "Select service: " choice
@@ -589,11 +578,9 @@ services_menu() {
       5) service_control_menu "pyuheprng-privatenesstools" "pyuheprng-privatenesstools" ;;
       6) service_control_menu "yggdrasil" "Yggdrasil" ;;
       7) service_control_menu "i2p-yggdrasil" "I2P-Yggdrasil" ;;
-      8) service_control_menu "amneziawg" "AmneziaWG" ;;
-      9) service_control_menu "skywire-amneziawg" "Skywire-AmneziaWG" ;;
-      10) service_control_menu "htcondor-cm" "HTCondor central manager" ;;
-      11) service_control_menu "htcondor-submit" "HTCondor submit node" ;;
-      12) service_control_menu "htcondor-execute" "HTCondor execute node" ;;
+      8) service_control_menu "htcondor-cm" "HTCondor central manager" ;;
+      9) service_control_menu "htcondor-submit" "HTCondor submit node" ;;
+      10) service_control_menu "htcondor-execute" "HTCondor execute node" ;;
       0) return 0 ;;
       *) echo "Invalid choice." ;;
     esac
@@ -834,86 +821,15 @@ test_i2p_yggdrasil() {
   fi
 }
 
-test_amneziawg() {
-  echo
-  echo -e "${yellow}Testing AmneziaWG tunnel (container + config + CLI)...${reset}"
-  local status
-  status=$(service_status "amneziawg")
-  if [ "$status" != "RUNNING" ]; then
-    echo -e " ${red}${check_fail_symbol}${reset} amneziawg container status: $status"
-    return 1
-  fi
-
-  echo -e " ${green}${check_ok_symbol}${reset} amneziawg container RUNNING"
-
-  # Config presence inside container
-  if MSYS_NO_PATHCONV=1 docker exec amneziawg test -f /etc/amneziawg/awg0.conf >/dev/null 2>&1; then
-    echo " -- /etc/amneziawg/awg0.conf present inside amneziawg container"
-  else
-    echo -e " ${red}${check_fail_symbol}${reset} /etc/amneziawg/awg0.conf missing in amneziawg container"
-    echo "    Hint: restart the amneziawg service so its entrypoint can generate a fresh config."
-    return 1
-  fi
-
-  # Useful CLI call via awg
-  local wg_info
-  wg_info=$(MSYS_NO_PATHCONV=1 docker exec amneziawg awg show awg0 2>/dev/null || true)
-  if [ -n "$wg_info" ]; then
-    echo " -- awg show awg0 (truncated):"
-    echo "$wg_info" | head -c 200; echo
-    echo -e " ${green}${check_ok_symbol}${reset} AmneziaWG CLI responding for awg0"
-    return 0
-  else
-    echo -e " ${red}${check_fail_symbol}${reset} awg show awg0 failed"
-    return 1
-  fi
-}
-
-test_skywire_amneziawg() {
-  echo
-  echo -e "${yellow}Testing Skywire-AmneziaWG access layer (container + config + CLI + HTTP)...${reset}"
-  if ! docker ps --format '{{.Names}}' | grep -q '^skywire-amneziawg$'; then
-    echo -e " ${red}${check_fail_symbol}${reset} skywire-amneziawg container not running"
-    return 1
-  fi
-
-  echo -e " ${green}${check_ok_symbol}${reset} skywire-amneziawg container RUNNING"
-
-  # Config presence inside container
-  if MSYS_NO_PATHCONV=1 docker exec skywire-amneziawg test -f /etc/amneziawg/awg0.conf >/dev/null 2>&1; then
-    echo " -- /etc/amneziawg/awg0.conf present inside skywire-amneziawg container"
-  else
-    echo -e " ${red}${check_fail_symbol}${reset} /etc/amneziawg/awg0.conf missing in skywire-amneziawg container"
-    echo "    Hint: restart the skywire-amneziawg service so its entrypoint can generate a fresh config."
-    return 1
-  fi
-
-  # Useful CLI call via skywire-cli
-  local visor_status
-  visor_status=$(MSYS_NO_PATHCONV=1 docker exec skywire-amneziawg skywire-cli visor status 2>/dev/null || true)
-  if [ -n "$visor_status" ]; then
-    echo " -- skywire-amneziawg skywire-cli visor status (truncated):"
-    echo "$visor_status" | head -c 200; echo
-    echo -e " ${green}${check_ok_symbol}${reset} Skywire-AmneziaWG CLI responding"
-  else
-    echo -e " ${red}${check_fail_symbol}${reset} skywire-amneziawg skywire-cli visor status failed"
-  fi
-
-  # HTTP check on the visor UI port mapped to 8002
-  check_tcp_port 127.0.0.1 8002 "Skywire-AmneziaWG visor UI" || true
-}
-
 test_full_node_overlays() {
   echo
-  echo -e "${yellow}Full node overlay/VPN services (Yggdrasil, I2P-Yggdrasil, Skywire, AmneziaWG, Skywire-AmneziaWG)...${reset}"
+  echo -e "${yellow}Full node overlay/VPN services (Yggdrasil, I2P-Yggdrasil, Skywire)...${reset}"
   require_docker || return 1
   local rc=0
 
   test_yggdrasil || rc=1
   test_i2p_yggdrasil || rc=1
   test_skywire || rc=1
-  test_amneziawg || rc=1
-  test_skywire_amneziawg || rc=1
 
   echo
   echo -e "${green}===== OVERLAY / VPN CONFIG SUMMARY =====${reset}"
@@ -959,34 +875,6 @@ test_full_node_overlays() {
     c_sky="n/a (container not present)"
   fi
   printf "  %-18s : %s, config: %s\n" "Skywire" "$s_sky" "$c_sky"
-
-  # AmneziaWG (standalone)
-  local s_awg c_awg
-  s_awg=$(service_status "amneziawg")
-  if [ "$s_awg" = "RUNNING" ] || [ "$s_awg" = "STOPPED" ]; then
-    if MSYS_NO_PATHCONV=1 docker exec amneziawg test -f /etc/amneziawg/awg0.conf >/dev/null 2>&1; then
-      c_awg="present (/etc/amneziawg/awg0.conf)"
-    else
-      c_awg="missing (/etc/amneziawg/awg0.conf)"
-    fi
-  else
-    c_awg="n/a (container not present)"
-  fi
-  printf "  %-18s : %s, config: %s\n" "AmneziaWG" "$s_awg" "$c_awg"
-
-  # Skywire-AmneziaWG (access layer + visor)
-  local s_sawg c_sawg
-  s_sawg=$(service_status "skywire-amneziawg")
-  if [ "$s_sawg" = "RUNNING" ] || [ "$s_sawg" = "STOPPED" ]; then
-    if MSYS_NO_PATHCONV=1 docker exec skywire-amneziawg test -f /etc/amneziawg/awg0.conf >/dev/null 2>&1; then
-      c_sawg="present (/etc/amneziawg/awg0.conf)"
-    else
-      c_sawg="missing (/etc/amneziawg/awg0.conf)"
-    fi
-  else
-    c_sawg="n/a (container not present)"
-  fi
-  printf "  %-18s : %s, config: %s\n" "Skywire-AmneziaWG" "$s_sawg" "$c_sawg"
 
   echo
   if [ "$rc" -eq 0 ]; then
