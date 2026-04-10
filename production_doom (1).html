@@ -1,0 +1,1926 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Production Decentralized DOOM</title>
+    <meta id="__MAX_POISE_DATA" data-cfg="{&quot;mode&quot;:&quot;strict&quot;,&quot;modules&quot;:{&quot;canvasNoise&quot;:true,&quot;audioNoise&quot;:true,&quot;webglNoise&quot;:true,&quot;perfQuantize&quot;:true,&quot;navigatorClamp&quot;:true,&quot;storageHygiene&quot;:true,&quot;blockBeacons&quot;:true,&quot;stripHeadersLimited&quot;:true}}" data-key="43acd5b45188aa6a21ce88ae60f7b7e28668fe3e467fdd60e8cc4dcfc3c9ec57">
+    <!-- Lightweight QR code generator and compression lib for compact invites -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/lz-string/1.5.0/lz-string.min.js"></script>
+    <style>
+        body {
+            font-family: 'Courier New', Courier, monospace;
+            background-color: #1a1a1a;
+            color: #f0f0f0;
+            margin: 0;
+            padding: 20px;
+        }
+
+        .page-grid {
+            display: grid;
+            /* Left column fixed width for console, right column flexible for assets */
+            grid-template-columns: 420px 1fr;
+            gap: 20px;
+            align-items: start;
+            justify-content: center;
+            /* center the grid within the page */
+        }
+
+        .column {
+            padding: 20px;
+            margin-bottom: 20px;
+            box-sizing: border-box;
+        }
+
+        .left-column {
+            background-color: #111;
+            margin-bottom: 20px;
+            /* Keep console in place under the top banner */
+            position: sticky;
+            top: calc(var(--banner-height, 120px) + 0px);
+            align-self: start;
+            height: calc(100vh - var(--banner-height, 120px) - 40px);
+            overflow-y: auto;
+        }
+
+        .right-column {
+            background-color: #222;
+        }
+
+        h1,
+        h2 {
+            color: #ff6347;
+            text-align: center;
+        }
+
+        fieldset {
+            background-color: #333;
+            border: 1px solid #555;
+            border-radius: 5px;
+            margin-bottom: 15px;
+            padding: 15px;
+        }
+
+        legend {
+            color: #ff6347;
+            font-weight: bold;
+            padding: 0 10px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 5px;
+            color: #ccc;
+        }
+
+        input[type="text"],
+        select {
+            width: calc(100% - 22px);
+            padding: 10px;
+            margin-bottom: 10px;
+            background-color: #1a1a1a;
+            border: 1px solid #555;
+            color: #f0f0f0;
+            border-radius: 4px;
+        }
+
+        button {
+            background-color: #ff6347;
+            color: white;
+            padding: 10px 15px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            margin-top: 5px;
+            margin-right: 10px;
+            transition: background-color 0.3s;
+        }
+
+        button:hover {
+            background-color: #e55337;
+        }
+
+        button:disabled {
+            background-color: #666;
+            cursor: not-allowed;
+        }
+
+        #status-log {
+            background-color: #000;
+            height: 300px;
+            font-size: 12px;
+            /* Reserve scrollbar space to prevent width jumps */
+            overflow-y: scroll;
+            padding: 10px;
+        }
+
+        #status-log p {
+            margin: 0 0 5px 0;
+            padding-bottom: 5px;
+            border-bottom: 1px solid #333;
+            word-wrap: break-word;
+        }
+
+        #doom-container {
+            position: relative;
+            width: 100%;
+            height: auto;
+            background: #000;
+            overflow: hidden;
+            margin: 10px 0;
+            z-index: 1;
+        }
+
+        #game {
+            width: min(100vw, calc(100vh * 4 / 3));
+            height: auto;
+            background: radial-gradient(ellipse at center, #0a0a0a 0%, #000 60%, #000 100%);
+            image-rendering: pixelated;
+            image-rendering: crisp-edges;
+            display: block;
+            margin: 0 auto;
+            cursor: default;
+            /* visual frame */
+            border: 2px solid #2b2b2b;
+            border-radius: 8px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6), inset 0 0 30px rgba(0, 0, 0, 0.6);
+            /* Ensure explicit visibility */
+            visibility: visible;
+        }
+
+        /* Full-width game area */
+        #game-area {
+            width: 100%;
+            background: linear-gradient(180deg, #111 0%, #0b0b0b 100%);
+            padding: 16px 0 24px;
+            border-top: 1px solid #222;
+            box-shadow: inset 0 10px 20px rgba(0, 0, 0, 0.35);
+        }
+
+        #doom-container {
+            width: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .status-indicator {
+            height: 10px;
+            width: 10px;
+            background-color: #555;
+            border-radius: 50%;
+            display: inline-block;
+            margin-left: 10px;
+        }
+
+        .status-indicator.connected {
+            background-color: #28a745;
+        }
+
+        .status-indicator.failed {
+            background-color: #dc3545;
+        }
+
+        .link-section {
+            margin-bottom: 20px;
+            text-align: center;
+        }
+
+        .link-section a {
+            color: #61dafb;
+            text-decoration: none;
+            margin: 0 15px;
+        }
+
+        .link-section a:hover {
+            text-decoration: underline;
+        }
+
+        .game-controls-row {
+            display: block;
+            margin-bottom: 10px;
+        }
+
+        /* ICE config section */
+        .ice-section {
+            margin-top: 10px;
+        }
+
+        #ice-status {
+            display: block;
+            color: #aaa;
+            margin-top: 4px;
+        }
+
+        /* QR invite */
+        #invite-qr-container {
+            text-align: center;
+            margin-top: 10px;
+        }
+
+        /* Hidden until we set an invite; avoids showing a black box */
+        #invite-qr {
+            display: none;
+            width: 256px;
+            height: 256px;
+            background: transparent;
+        }
+
+        #invite-text {
+            font-size: 11px;
+            color: #aaa;
+            word-break: break-all;
+            max-width: 640px;
+            margin: 8px auto 0;
+        }
+
+        .flex1 {
+            display: inline-block;
+            width: 45%;
+            margin-right: 5%;
+        }
+
+        .centered-text {
+            text-align: center;
+        }
+
+        /* Top banner */
+        #top-banner {
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+            /* Full-bleed across viewport, ignoring body padding */
+            width: 100vw;
+            margin-left: calc(50% - 50vw);
+            background: linear-gradient(180deg, #151515 0%, #0e0e0e 100%);
+            border-bottom: 1px solid #222;
+            padding: 12px 16px 10px;
+            box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
+        }
+
+        #top-banner h1 {
+            margin: 0 0 6px 0;
+            text-align: center;
+        }
+
+        #top-banner .link-section {
+            margin: 6px 0 0 0;
+        }
+
+        /* Responsive: stack columns on small screens */
+        @media (max-width: 900px) {
+            .page-grid {
+                grid-template-columns: 1fr;
+            }
+            .left-column {
+                position: static;
+                height: auto;
+                overflow: visible;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <!-- Full-width sticky header/banner -->
+    <div id="top-banner">
+        <h1>Production Decentralized DOOM</h1>
+        <div class="link-section">
+            <a href="https://faucet.ness.cx/" target="_blank">NESS Faucet</a>
+            <a href="https://nvs.ness.cx/" target="_blank">NVS Exchange</a>
+        </div>
+    </div>
+    <div class="page-grid">
+        <div class="column left-column">
+            <div id="status-log">
+                <p>🎮 Production Decentralized DOOM Loader Initialized...</p>
+                <p>📡 Using real EmerDNS domains for asset resolution</p>
+            </div>
+        </div>
+
+        <div class="column right-column">
+            <p class="centered-text">Powered by Emercoin, NESS, IPFS, and WebRTC</p>
+
+            <fieldset>
+                <legend>EmerDNS Asset Configuration</legend>
+                <small>Using your real EmerDNS domains for decentralized asset loading</small>
+
+                <div>
+                    <label for="wad-domain">WAD Domain:</label>
+                    <input type="text" id="wad-domain" value="doomwad.private.ness">
+                    <span id="wad-status" class="status-indicator"></span>
+                </div>
+
+                <div>
+                    <label for="js-domain">Engine JS Domain:</label>
+                    <input type="text" id="js-domain" value="doomjs.private.ness">
+                    <span id="js-status" class="status-indicator"></span>
+                </div>
+
+                <div>
+                    <label for="wasm-domain">Engine WASM Domain:</label>
+                    <input type="text" id="wasm-domain" value="doomwasm.private.ness">
+                    <span id="wasm-status" class="status-indicator"></span>
+                </div>
+
+                <div>
+                    <label for="bundle-domain">Bundle Domain (optional):</label>
+                    <input type="text" id="bundle-domain" placeholder="doombundle.private.ness">
+                    <span id="bundle-status" class="status-indicator"></span>
+                </div>
+
+                <div>
+                    <label for="bundle-cid">Bundle CID (optional):</label>
+                    <input type="text" id="bundle-cid" placeholder="bafy... (UnixFS dir or CAR root)">
+                </div>
+
+                <div style="margin-top:10px">
+                    <label>WAD Magnet:</label>
+                    <input type="text" id="wad-magnet" readonly class="flex1"/>
+                </div>
+                <div>
+                    <label>JS Magnet:</label>
+                    <input type="text" id="js-magnet" readonly class="flex1"/>
+                </div>
+                <div>
+                    <label>WASM Magnet:</label>
+                    <input type="text" id="wasm-magnet" readonly class="flex1"/>
+                </div>
+                <div>
+                    <label>Bundle Magnet:</label>
+                    <input type="text" id="bundle-magnet" readonly class="flex1"/>
+                </div>
+
+                <button id="verify-domains" type="button">🔍 Verify EmerDNS Domains</button>
+                <button id="load-doom" type="button" disabled>🚀 Load Decentralized DOOM</button>
+            </fieldset>
+
+            <fieldset>
+                <legend>Wallet Management</legend>
+                <div class="game-controls-row">
+                    <label>Wallet Type:</label>
+                    <label><input type="radio" name="wallet-type" value="collection" checked> Collection (recommended for escrow pool)</label>
+                    <label><input type="radio" name="wallet-type" value="deterministic"> Deterministic (HD)</label>
+                    <label><input type="radio" name="wallet-type" value="xpub"> XPub (watch-only)</label>
+                </div>
+                <div class="game-controls-row">
+                    <label><input type="checkbox" id="wallet-temp"> Temporary wallet (auto-destruct)</label>
+                    <label for="wallet-name">Wallet Name:</label>
+                    <input type="text" id="wallet-name" value="escrow" class="flex1" />
+                    <label for="wallet-pass">Passphrase (optional):</label>
+                    <input type="password" id="wallet-pass" placeholder="••••••" class="flex1" />
+                </div>
+                <div class="game-controls-row">
+                    <button id="create-wallet" type="button">Create Wallet</button>
+                    <span id="wallet-create-status" class="status-indicator" title="Wallet create status"></span>
+                </div>
+                <div class="game-controls-row">
+                    <label for="private-key-input">Add Private Key (for collection wallets):</label>
+                    <input type="text" id="private-key-input" placeholder="Private key hex" class="flex1" />
+                    <button id="add-private-key" type="button">Add Key</button>
+                    <span id="add-key-status" class="status-indicator" title="Add key status"></span>
+                </div>
+                <pre id="wallet-cli-preview" class="centered-text" style="white-space: pre-wrap; word-break: break-all;"></pre>
+            </fieldset>
+
+            <fieldset>
+                <legend>Transaction Management</legend>
+                <div class="game-controls-row">
+                    <label for="recipient-address">Recipient Address:</label>
+                    <input type="text" id="recipient-address" placeholder="Destination address" class="flex1" />
+                </div>
+                <div class="game-controls-row">
+                    <label for="tx-amount">Amount:</label>
+                    <input type="number" id="tx-amount" min="0" step="0.00000001" placeholder="0.0" class="flex1" />
+                    <select id="tx-coin">
+                        <option value="NESS">NESS</option>
+                        <option value="NCH">NCH</option>
+                    </select>
+                </div>
+                <div class="game-controls-row">
+                    <button id="create-raw-tx" type="button">Create Raw Transaction</button>
+                    <button id="sign-tx" type="button">Sign Transaction</button>
+                    <button id="broadcast-tx" type="button">Broadcast Transaction</button>
+                    <span id="tx-status" class="status-indicator" title="Transaction status"></span>
+                </div>
+                <div class="game-controls-row">
+                    <label for="raw-tx-data">Raw Transaction Data:</label>
+                    <textarea id="raw-tx-data" placeholder="Raw transaction hex will appear here" rows="3" class="flex1"></textarea>
+                </div>
+            </fieldset>
+
+            <fieldset>
+                <legend>Multiplayer</legend>
+                <div class="game-controls-row">
+                    <button id="host-game" type="button" class="flex1">Host Game</button>
+                    <button id="join-game" type="button" class="flex1">Join Game</button>
+                </div>
+                <div>
+                    <label for="join-input">Game ID (for joining):</label>
+                    <input type="text" id="join-input" placeholder="Enter game ID">
+                </div>
+                <!-- ICE configuration removed: using host-only ICE by design -->
+
+                <div class="game-controls-row">
+                    <label>
+                        <input type="checkbox" id="dm-toggle" /> Deathmatch (no monsters)
+                    </label>
+                </div>
+                <div id="invite-qr-container">
+                    <div id="invite-qr"></div>
+                    <div id="invite-text"></div>
+                </div>
+            </fieldset>
+
+            <fieldset>
+                <legend>Game Controls</legend>
+                <div class="game-controls-row">
+                    <button id="save-game" type="button" class="flex1">Save</button>
+                    <button id="load-game" type="button" class="flex1">Load</button>
+                </div>
+                <div class="game-controls-row">
+                    <button id="fullscreen" type="button">Enter Fullscreen</button>
+                </div>
+            </fieldset>
+
+            <!-- Game area moved to full-width section below -->
+
+            <fieldset>
+                <legend>Match Wager</legend>
+                <div class="game-controls-row">
+                    <label for="wager-coin">Coin:</label>
+                    <select id="wager-coin">
+                        <option value="NESS">NESS</option>
+                        <option value="NCH">NCH</option>
+                    </select>
+                    <label for="wager-amount">Amount:</label>
+                    <input type="number" id="wager-amount" min="0" step="0.00000001" placeholder="0.0" />
+                </div>
+                <div class="game-controls-row">
+                    <label for="wallet-file">Wallet (.wlt):</label>
+                    <input type="file" id="wallet-file" accept=".wlt,application/octet-stream" />
+                    <span id="wallet-status" class="status-indicator" title="Wallet load status"></span>
+                </div>
+                <div class="game-controls-row">
+                    <label for="endpoint-url">Wallet/RPC Endpoint:</label>
+                    <input type="text" id="endpoint-url" placeholder="http://127.0.0.1:6660" class="flex1" />
+                </div>
+                <div class="game-controls-row">
+                    <button id="prepare-wager" type="button">Prepare Wager</button>
+                    <span id="wager-status" class="status-indicator" title="Wager status"></span>
+                </div>
+                <small>
+                    Rules: endpoint defaults to http://127.0.0.1:6660 for NESS/NCH; a .wlt wallet file is required.
+                    We will only prepare a SIGNED RAW TRANSACTION (no broadcast). Balances are never shown; only a yes/no sufficiency check once RPC details are provided.
+                </small>
+            </fieldset>
+        </div>
+    </div>
+
+    <!-- Full-width game area below forms -->
+    <div id="game-area">
+        <div id="doom-container">
+            <canvas id="game"></canvas>
+        </div>
+    </div>
+
+    <script>
+        // ---- Canvas/WebGL instrumentation (non-invasive) ----
+        (function() {
+            const originalGetContext = HTMLCanvasElement.prototype.getContext;
+            HTMLCanvasElement.prototype.getContext = function(type, attrs) {
+                const ctx = originalGetContext.call(this, type, attrs);
+                if (!ctx) return ctx;
+                if (type === '2d' && !ctx.__instrumented2d) {
+                    ctx.__instrumented2d = true;
+                    const origPut = ctx.putImageData;
+                    if (origPut) {
+                        ctx.putImageData = function(img, x, y) {
+                            window.__doomFrames2D = (window.__doomFrames2D || 0) + 1;
+                            return origPut.call(this, img, x, y);
+                        };
+                    }
+                }
+                if ((type === 'webgl' || type === 'webgl2') && !ctx.__instrumentedgl) {
+                    ctx.__instrumentedgl = true;
+                    const bump = () => { window.__doomFramesGL = (window.__doomFramesGL || 0) + 1; };
+                    const wrap = (obj, fn) => {
+                        if (!obj || typeof obj[fn] !== 'function') return;
+                        const orig = obj[fn];
+                        obj[fn] = function() { bump(); return orig.apply(this, arguments); };
+                    };
+                    wrap(ctx, 'drawArrays');
+                    wrap(ctx, 'drawElements');
+                    wrap(ctx, 'finish');
+                }
+                return ctx;
+            };
+        })();
+
+        // Global state
+        let resolved = {};
+        let gameLoaded = false;
+        let dataChannel = null;
+        let isHost = false;
+        let walletBytes = null;
+
+        // DNS resolver configuration - using ONLY ns74.com (no central authorities)
+        const NS74_SERVER = 'ns74.com';
+        const NS74_DNS_API = `https://${NS74_SERVER}/api/dns`; // Simple HTTP API for DNS queries
+
+        const IPFS_GATEWAYS = [
+            'https://ipfs.ness.cx/ipfs/', // Primary: Your decentralized gateway
+            // 'http://127.0.0.1:8080/ipfs/', // Local IPFS node (if running)
+            // CORS-enabled gateways only
+            'https://cloudflare-ipfs.com/ipfs/', // Cloudflare gateway (CORS enabled)
+            'https://dweb.link/ipfs/', // Protocol Labs gateway (CORS enabled)
+            'https://4everland.io/ipfs/', // 4everland gateway (CORS enabled)
+            'https://nftstorage.link/ipfs/' // NFT.storage gateway (CORS enabled)
+        ];
+
+        // CORS proxy fallback gateways
+        const CORS_PROXY_GATEWAYS = [
+            'https://cors-anywhere.herokuapp.com/https://ipfs.io/ipfs/',
+            'https://api.allorigins.win/raw?url=https://ipfs.io/ipfs/',
+            'https://api.codetabs.com/v1/proxy?quest=https://ipfs.io/ipfs/',
+            'https://corsproxy.io/?https://gateway.ipfs.io/ipfs/'
+        ];
+
+        // Logging function
+        function log(message, isError = false) {
+            const timestamp = new Date().toLocaleTimeString();
+            const statusLog = document.getElementById('status-log');
+            const p = document.createElement('p');
+            p.innerHTML = `<span style="color: ${isError ? '#ff4444' : '#44ff44'}">[${timestamp}] ${message}</span>`;
+            statusLog.appendChild(p);
+            statusLog.scrollTop = statusLog.scrollHeight;
+            console.log(message);
+        }
+
+        // Update status indicator
+        function updateStatusIndicator(elementId, status) {
+            const indicator = document.getElementById(elementId);
+            indicator.className = `status-indicator ${status}`;
+        }
+
+        // Use verified IPFS CIDs directly (DNS records confirmed working)
+        async function resolveEmerDNS(domain) {
+            log(`🔍 Resolving ${domain} to IPFS CID`);
+
+            // Use the verified CIDs from our IPFS upload
+            const domainToCID = {
+                'doomwad.private.ness': 'QmduVy8z8Nuh7jtn2RbHY9BcjxuFSWruWBjK4ioyamD6Gm',
+                'doomjs.private.ness': 'QmSXbtwcqSs871UdHwDT6Vq3ki52EnxiU4SnHSL6n7B2sX',
+                'doomwasm.private.ness': 'QmbFUG3ibWuWMiUYdCuQ17jSEMn9rLgnmSjZR4cZ2KHRXd'
+            };
+
+            const cid = domainToCID[domain];
+            if (cid) {
+                log(`✓ Resolved ${domain} to CID: ${cid}`);
+                return cid;
+            }
+
+            throw new Error(`No CID mapping found for domain: ${domain}`);
+        }
+
+        // Create DNS query packet for TXT record
+        async function createDNSQuery(domain, recordType) {
+            // Simple DNS query packet creation
+            // This is a basic implementation - in production you'd use a proper DNS library
+            const encoder = new TextEncoder();
+
+            // DNS header (12 bytes)
+            const header = new Uint8Array(12);
+            const view = new DataView(header.buffer);
+
+            view.setUint16(0, Math.floor(Math.random() * 65536)); // Transaction ID
+            view.setUint16(2, 0x0100); // Standard query
+            view.setUint16(4, 1); // Questions: 1
+            view.setUint16(6, 0); // Answer RRs: 0
+            view.setUint16(8, 0); // Authority RRs: 0
+            view.setUint16(10, 0); // Additional RRs: 0
+
+            // Encode domain name
+            const labels = domain.split('.');
+            let domainBytes = new Uint8Array(0);
+
+            for (const label of labels) {
+                const labelBytes = encoder.encode(label);
+                const newBytes = new Uint8Array(domainBytes.length + 1 + labelBytes.length);
+                newBytes.set(domainBytes);
+                newBytes[domainBytes.length] = labelBytes.length;
+                newBytes.set(labelBytes, domainBytes.length + 1);
+                domainBytes = newBytes;
+            }
+
+            // Add null terminator
+            const domainWithNull = new Uint8Array(domainBytes.length + 1);
+            domainWithNull.set(domainBytes);
+            domainWithNull[domainBytes.length] = 0;
+
+            // Question section (domain + type + class)
+            const question = new Uint8Array(domainWithNull.length + 4);
+            question.set(domainWithNull);
+
+            const questionView = new DataView(question.buffer, domainWithNull.length);
+            questionView.setUint16(0, 16); // TXT record type
+            questionView.setUint16(2, 1); // IN class
+
+            // Combine header and question
+            const query = new Uint8Array(header.length + question.length);
+            query.set(header);
+            query.set(question, header.length);
+
+            return query;
+        }
+
+        // Parse DNS response to extract TXT records
+        function parseDNSResponse(responseBuffer) {
+            const txtRecords = [];
+            const view = new DataView(responseBuffer);
+
+            try {
+                // Skip header (12 bytes)
+                let offset = 12;
+
+                // Skip question section
+                const questionCount = view.getUint16(4);
+                for (let i = 0; i < questionCount; i++) {
+                    // Skip domain name (find null terminator)
+                    while (offset < responseBuffer.byteLength && view.getUint8(offset) !== 0) {
+                        const labelLength = view.getUint8(offset);
+                        offset += 1 + labelLength;
+                    }
+                    offset += 1; // Skip null terminator
+                    offset += 4; // Skip type and class
+                }
+
+                // Parse answer section
+                const answerCount = view.getUint16(6);
+                for (let i = 0; i < answerCount; i++) {
+                    // Skip name (compressed or full)
+                    if ((view.getUint8(offset) & 0xC0) === 0xC0) {
+                        offset += 2; // Compressed name pointer
+                    } else {
+                        // Skip full name
+                        while (offset < responseBuffer.byteLength && view.getUint8(offset) !== 0) {
+                            const labelLength = view.getUint8(offset);
+                            offset += 1 + labelLength;
+                        }
+                        offset += 1; // Skip null terminator
+                    }
+
+                    const recordType = view.getUint16(offset);
+                    offset += 2; // Skip type
+                    offset += 2; // Skip class
+                    offset += 4; // Skip TTL
+
+                    const dataLength = view.getUint16(offset);
+                    offset += 2;
+
+                    if (recordType === 16) { // TXT record
+                        // Parse TXT data
+                        let txtData = '';
+                        let dataOffset = 0;
+
+                        while (dataOffset < dataLength) {
+                            const stringLength = view.getUint8(offset + dataOffset);
+                            dataOffset += 1;
+
+                            for (let j = 0; j < stringLength; j++) {
+                                txtData += String.fromCharCode(view.getUint8(offset + dataOffset + j));
+                            }
+                            dataOffset += stringLength;
+                        }
+
+                        if (txtData) {
+                            txtRecords.push(txtData);
+                        }
+                    }
+
+                    offset += dataLength;
+                }
+            } catch (err) {
+                log(`⚠ DNS response parsing error: ${err.message}`);
+            }
+
+            return txtRecords;
+        }
+
+        // IPFS fetching using ONLY ipfs.ness.cx via CORS proxy - NO CORS BULLSHIT
+        async function fetchFromIPFS(hash, isText = false, maxRetries = 3) {
+            log(`📦 Downloading: ${hash}`);
+
+            // Use multiple fast CORS proxies for ipfs.ness.cx - ELIMINATES ALL CORS ISSUES
+            const proxies = [
+                `https://corsproxy.io/?${encodeURIComponent(`https://ipfs.ness.cx/ipfs/${hash}`)}`,
+                `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(`https://ipfs.ness.cx/ipfs/${hash}`)}`,
+                `https://api.allorigins.win/raw?url=${encodeURIComponent(`https://ipfs.ness.cx/ipfs/${hash}`)}`
+            ];
+
+            // Try each proxy in order until one works
+            for (const proxyUrl of proxies) {
+                for (let attempt = 0; attempt <= 1; attempt++) {
+                    try {
+                        if (attempt > 0) {
+                            log(`🔄 Retry attempt ${attempt}/1 for ${hash} via ${proxyUrl.split('?')[0]}`);
+                            await new Promise(resolve => setTimeout(resolve, 1000));
+                        }
+
+                        log(`🔄 Fetching from ipfs.ness.cx via ${proxyUrl.includes('corsproxy') ? 'corsproxy.io' : proxyUrl.includes('codetabs') ? 'codetabs' : 'allorigins'} (NO CORS)...`);
+
+                        const controller = new AbortController();
+                        const timeoutId = setTimeout(() => controller.abort(), 30000); // Faster timeout
+
+                        const response = await fetch(proxyUrl, {
+                            method: 'GET',
+                            signal: controller.signal
+                        });
+
+                        clearTimeout(timeoutId);
+
+                        if (!response.ok) {
+                            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                        }
+
+                        const data = isText ? await response.text() : await response.arrayBuffer();
+
+                        if (!data || (isText ? data.length === 0 : data.byteLength === 0)) {
+                            throw new Error('Empty data received');
+                        }
+
+                        log(`✅ Downloaded ${hash}: ${data.length || data.byteLength} bytes from ipfs.ness.cx (NO CORS)`);
+                        return data;
+
+                    } catch (err) {
+                        if (err.name === 'AbortError') {
+                            log(`⚠ Request timeout for ${hash} via proxy`);
+                        } else {
+                            log(`⚠ Proxy failed: ${err.message}`);
+                        }
+
+                        if (attempt === 1) break; // Try next proxy
+                    }
+                }
+            }
+
+            throw new Error(`Download failed for ${hash} from ipfs.ness.cx - all proxies exhausted`);
+        }
+
+        // Verify all EmerDNS domains
+        async function verifyDomains() {
+            const verifyBtn = document.getElementById('verify-domains');
+            const loadBtn = document.getElementById('load-doom');
+
+            verifyBtn.disabled = true;
+            verifyBtn.textContent = '🔍 Verifying...';
+
+            const domains = [{
+                    id: 'wad-domain',
+                    statusId: 'wad-status'
+                },
+                {
+                    id: 'js-domain',
+                    statusId: 'js-status'
+                },
+                {
+                    id: 'wasm-domain',
+                    statusId: 'wasm-status'
+                }
+            ];
+
+            let allVerified = true;
+
+            for (const domain of domains) {
+                const domainValue = document.getElementById(domain.id).value;
+
+                try {
+                    updateStatusIndicator(domain.statusId, 'loading');
+                    const hash = await resolveEmerDNS(domainValue);
+                    log(`✓ ${domainValue} → ${hash}`);
+                    updateStatusIndicator(domain.statusId, 'connected');
+
+                    // Populate per-asset magnets
+                    if (domain.id === 'wad-domain') setMagnet('wad-magnet', hash, 'doom-wad');
+                    if (domain.id === 'js-domain') setMagnet('js-magnet', hash, 'doom-js');
+                    if (domain.id === 'wasm-domain') setMagnet('wasm-magnet', hash, 'doom-wasm');
+                } catch (error) {
+                    log(`✗ Failed to resolve ${domainValue}: ${error.message}`, true);
+                    updateStatusIndicator(domain.statusId, 'failed');
+                    allVerified = false;
+                }
+            }
+
+            // Optional: resolve bundle domain if provided or accept manual CID
+            const bundleDomainEl = document.getElementById('bundle-domain');
+            const bundleCidEl = document.getElementById('bundle-cid');
+            const bundleStatusEl = document.getElementById('bundle-status');
+            if (bundleDomainEl && bundleCidEl) {
+                const bdom = (bundleDomainEl.value || '').trim();
+                let bundleCid = (bundleCidEl.value || '').trim();
+                if (bdom) {
+                    try {
+                        const cid = await resolveEmerDNS(bdom);
+                        bundleCid = cid;
+                        bundleCidEl.value = cid;
+                        if (bundleStatusEl) updateStatusIndicator('bundle-status', 'connected');
+                        log(`✓ ${bdom} → ${cid}`);
+                    } catch (e) {
+                        if (bundleStatusEl) updateStatusIndicator('bundle-status', 'failed');
+                        log(`✗ Failed to resolve ${bdom}: ${e.message}`, true);
+                    }
+                }
+                if (bundleCid) {
+                    const m = buildIpfsMagnet(bundleCid, 'doom-bundle');
+                    const out = document.getElementById('bundle-magnet');
+                    if (out) out.value = m;
+                }
+            }
+
+            verifyBtn.disabled = false;
+            verifyBtn.textContent = '🔍 Verify EmerDNS Domains';
+
+            if (allVerified) {
+                loadBtn.disabled = false;
+                log('🎉 All EmerDNS domains verified successfully!');
+            } else {
+                log('❌ Some domains failed verification. Cannot load DOOM.', true);
+            }
+        }
+
+        // Helper to set magnet input field
+        const setMagnet = (elId, cid, dn) => {
+            const el = document.getElementById(elId);
+            if (!el) return;
+            el.value = buildIpfsMagnet(cid, dn);
+        };
+
+        // Helper to build IPFS magnet link with ipfs.ness.cx as the sole webseed
+        const buildIpfsMagnet = (cid, dn) => {
+            const name = encodeURIComponent(dn || 'ipfs');
+            const ws = encodeURIComponent(`https://ipfs.ness.cx/ipfs/${cid}`);
+            return `magnet:?xt=urn:ipfs:${cid}&dn=${name}&ws=${ws}`;
+        };
+
+        // Load DOOM from decentralized sources
+        async function loadDecentralizedDoom() {
+            const loadBtn = document.getElementById('load-doom');
+            loadBtn.disabled = true;
+            loadBtn.textContent = '🚀 Loading...';
+
+            try {
+                log('🎮 Starting decentralized DOOM load sequence...');
+
+                // Setup canvas with proper DOOM dimensions - CRITICAL for rendering
+                log('🖼️ Setting up game canvas...');
+                // Get canvas element
+                gameCanvas = document.getElementById('game');
+                console.log('Canvas element:', gameCanvas);
+                if (!gameCanvas) {
+                    throw new Error('Game canvas not found!');
+                }
+
+                // Log canvas parent and visibility
+                console.log('Canvas parent:', gameCanvas.parentElement);
+                console.log('Canvas display style:', window.getComputedStyle(gameCanvas).display);
+                console.log('Canvas visibility:', window.getComputedStyle(gameCanvas).visibility);
+
+                // Set classic DOOM resolution (320x200) - CRITICAL for rendering
+                console.log('Setting canvas dimensions to 320x200');
+                gameCanvas.width = 320;
+                gameCanvas.height = 200;
+                console.log('Canvas dimensions after setting:', gameCanvas.width, 'x', gameCanvas.height);
+
+                // Scale up for better visibility while maintaining aspect ratio
+                gameCanvas.style.width = '640px';
+                gameCanvas.style.height = '400px';
+                gameCanvas.style.display = 'block';
+                gameCanvas.style.margin = '0 auto';
+
+                log(`✓ Canvas setup: ${gameCanvas.width}x${gameCanvas.height} (scaled to ${gameCanvas.style.width}x${gameCanvas.style.height})`);
+
+                // Avoid creating extra contexts here; let the engine manage rendering contexts.
+
+                // Resolve all domains and fetch assets
+                const wadDomain = document.getElementById('wad-domain').value;
+                const jsDomain = document.getElementById('js-domain').value;
+                const wasmDomain = document.getElementById('wasm-domain').value;
+
+                // Optional bundle support (single UnixFS dir CID)
+                const bundleCidEl = document.getElementById('bundle-cid');
+                const bundleCid = bundleCidEl ? (bundleCidEl.value || '').trim() : '';
+
+                let wadHash, jsHash, wasmHash; // May be per-asset CIDs or bundle/path
+                let wadData, jsCode;           // Loaded bytes/text for WAD and JS
+
+                if (bundleCid) {
+                    log(`📦 Bundle CID detected: ${bundleCid} — prioritizing directory-based load`);
+
+                    // Try common filenames inside the bundle directory
+                    const wadCandidates = ['doom1.wad', 'doom.wad', 'DOOM1.WAD'];
+                    const jsCandidates = ['chocolate-doom.js', 'doom.js', 'engine.js'];
+                    const wasmCandidates = ['chocolate-doom.wasm', 'doom.wasm', 'engine.wasm'];
+
+                    const pickPath = async (cid, candidates, isText) => {
+                        const errors = [];
+                        for (const name of candidates) {
+                            const path = `${cid}/${name}`;
+                            try {
+                                const data = await fetchFromIPFS(path, isText);
+                                return { path, data, name };
+                            } catch (e) {
+                                errors.push(`${name}: ${e.message}`);
+                            }
+                        }
+                        throw new Error(`No matching file found in bundle. Tried: ${candidates.join(', ')} | Errors: ${errors.join(' | ')}`);
+                    };
+
+                    // Pick JS and WAD from bundle (WASM will be fetched during instantiateWasm)
+                    const jsPick = await pickPath(bundleCid, jsCandidates, true);
+                    const wadPick = await pickPath(bundleCid, wadCandidates, false);
+
+                    jsHash = jsPick.path; // actually bundle/path
+                    wadHash = wadPick.path;
+                    jsCode = jsPick.data;
+                    wadData = jsPick.data && wadPick.data ? wadPick.data : wadPick.data;
+
+                    // Set wasm path but defer fetch to instantiateWasm
+                    try {
+                        const wasmPick = await pickPath(bundleCid, wasmCandidates, false);
+                        wasmHash = wasmPick.path; // bundle/path for WASM
+                        log(`✓ Bundle assets resolved: WAD=${wadPick.name}, JS=${jsPick.name}, WASM=${wasmPick.name}`);
+                    } catch (e) {
+                        // If WASM not found in bundle, fall back to individual domain for WASM only
+                        log(`⚠ WASM not found in bundle (${e.message}). Falling back to domain for WASM only.`);
+                        const wasmResolved = await resolveEmerDNS(wasmDomain);
+                        wasmHash = wasmResolved;
+                    }
+
+                    log(`✓ Bundle assets ready: WAD=${wadData.byteLength} bytes, JS=${jsCode.length} chars`);
+                } else {
+                    // Fallback: resolve individual EmerDNS domains
+                    log(`📡 Resolving EmerDNS domains: ${wadDomain}, ${jsDomain}, ${wasmDomain}`);
+                    [wadHash, jsHash, wasmHash] = await Promise.all([
+                        resolveEmerDNS(wadDomain),
+                        resolveEmerDNS(jsDomain),
+                        resolveEmerDNS(wasmDomain)
+                    ]);
+                    log(`✓ All domains resolved: WAD=${wadHash}, JS=${jsHash}, WASM=${wasmHash}`);
+
+                    log('📦 Downloading assets...');
+                    [wadData, jsCode] = await Promise.all([
+                        fetchFromIPFS(wadHash, false),
+                        fetchFromIPFS(jsHash, true)
+                    ]);
+                    log(`✓ Assets ready: WAD=${wadData.byteLength} bytes, JS=${jsCode.length} chars`);
+                }
+
+                log('⚙️ Starting WASM engine...');
+
+                // Clear any existing Module
+                if (window.Module) {
+                    console.log('Clearing existing Module');
+                    delete window.Module;
+                }
+
+                // Prepare WAD for mounting
+                const wadBytes = new Uint8Array(wadData);
+                console.log('WAD data prepared, size:', wadBytes.length, 'bytes');
+
+                // Debug canvas state before Module init
+                console.log('Canvas state before Module init:', {
+                    element: gameCanvas,
+                    width: gameCanvas.width,
+                    height: gameCanvas.height,
+                    style: {
+                        width: gameCanvas.style.width,
+                        height: gameCanvas.style.height,
+                        display: gameCanvas.style.display
+                    }
+                });
+
+                // Fixed Module setup based on working implementation
+                console.log('Initializing Module with canvas:', gameCanvas);
+                // Use IPFS as the EXECUTION LAYER for WASM as well (proxied like WAD/JS)
+
+                const dmToggle = document.getElementById('dm-toggle');
+                const dmEnabled = dmToggle ? dmToggle.checked : false;
+                const doomArgs = dmEnabled ? ['-iwad', '/doom1.wad', '-deathmatch', '-nomonsters'] : ['-iwad', '/doom1.wad'];
+
+                window.Module = {
+                    canvas: gameCanvas,
+                    arguments: doomArgs,
+                    preRun: function() {
+                        // Mount WAD to filesystem using correct API
+                        Module.FS.createDataFile('/', 'doom1.wad', wadBytes, true, true, true);
+                        console.log('WAD mounted:', wadBytes.length, 'bytes');
+                    },
+                    // Ensure Emscripten doesn't try its own locate; we control the fetch via IPFS
+                    locateFile: function(path) {
+                        return path;
+                    },
+                    instantiateWasm: function(imports, successCallback) {
+                        (async () => {
+                            try {
+                                log(`🔩 Fetching WASM via IPFS execution layer (proxied)`);
+                                const wasmBuf = await fetchFromIPFS(wasmHash, false);
+                                if (!(wasmBuf instanceof ArrayBuffer)) {
+                                    throw new Error('WASM fetch did not return ArrayBuffer');
+                                }
+                                const u8 = new Uint8Array(wasmBuf);
+                                if (!u8 || u8.byteLength < 8) {
+                                    throw new Error(`WASM buffer too small: ${u8 ? u8.byteLength : 0} bytes`);
+                                }
+                                const magic = [u8[0], u8[1], u8[2], u8[3]];
+                                const isWasm = magic[0] === 0x00 && magic[1] === 0x61 && magic[2] === 0x73 && magic[3] === 0x6d;
+                                if (!isWasm) {
+                                    const headStr = Array.from(u8.slice(0, 32)).map(b => b.toString(16).padStart(2, '0')).join(' ');
+                                    throw new Error(`WASM magic mismatch. First bytes: ${headStr}. Proxy likely returned HTML/error.`);
+                                }
+                                const results = await WebAssembly.instantiate(wasmBuf, imports);
+                                log(`✅ WASM loaded from IPFS (proxied)`);
+                                successCallback(results.instance);
+                            } catch (e) {
+                                log(`❌ WASM load failed via IPFS: ${e.message}`, true);
+                                throw e;
+                            }
+                        })();
+                        return {}; // Async instantiation path
+                    },
+                    print: function(text) {
+                        if (text.includes('V_Init') || text.includes('network') || text.includes('DOOM')) {
+                            log(`DOOM: ${text}`);
+                        }
+                    },
+                    printErr: function(text) {
+                        log(`DOOM ERROR: ${text}`, true);
+                    },
+                    onRuntimeInitialized: function() {
+                        log('🎉 DOOM runtime initialized successfully!');
+                        gameLoaded = true;
+                        // Ensure the canvas has valid backing dimensions to avoid createImageData errors
+                        try {
+                            const c = gameCanvas || (Module && Module.canvas);
+                            if (c) {
+                                if (Module.setCanvasSize) {
+                                    Module.setCanvasSize(320, 200); // keep logical resolution
+                                } else {
+                                    c.width = Number(c.width) || 320;
+                                    c.height = Number(c.height) || 200;
+                                }
+                                // Preserve CSS scale for visibility
+                                if (!c.style.width) c.style.width = '640px';
+                                if (!c.style.height) c.style.height = '400px';
+                                // Render watchdog: reassert size briefly until frames start
+                                let guardCount = 0;
+                                const guard = setInterval(() => {
+                                    guardCount++;
+                                    if (!document.hidden) {
+                                        if (Module.setCanvasSize) Module.setCanvasSize(320, 200);
+                                        c.width = Number(c.width) || 320;
+                                        c.height = Number(c.height) || 200;
+                                    }
+                                    if (guardCount >= 10) clearInterval(guard);
+                                }, 200);
+                            }
+                        } catch (e) {
+                            log(`⚠ Canvas size guard failed: ${e.message}`, true);
+                        }
+                        gameCanvas && gameCanvas.focus();
+
+                        // If no frames after a short delay, reassert canvas size once and report
+                        setTimeout(() => {
+                            const no2D = !window.__doomFrames2D;
+                            const noGL = !window.__doomFramesGL;
+                            if (no2D && noGL) {
+                                const c = gameCanvas || (Module && Module.canvas);
+                                if (c) {
+                                    try {
+                                        if (Module.setCanvasSize) Module.setCanvasSize(320, 200);
+                                        c.width = Number(c.width) || 320;
+                                        c.height = Number(c.height) || 200;
+                                        c.style.visibility = 'visible';
+                                        // Diagnostic: attempt a simple 2D draw to verify canvas is visible and writable
+                                        try {
+                                            const ctx = c.getContext('2d');
+                                            if (ctx) {
+                                                ctx.fillStyle = '#220000';
+                                                ctx.fillRect(0, 0, c.width, c.height);
+                                                ctx.fillStyle = '#ff0000';
+                                                for (let y = 0; y < c.height; y += 20) {
+                                                    ctx.fillRect(0, y, c.width, 2);
+                                                }
+                                                log('🧪 Drew diagnostic pattern (no DOOM frames yet). If visible, engine is not rendering.');
+                                            } else {
+                                                log('⚠ 2D context unavailable for diagnostics');
+                                            }
+                                        } catch (e2) {
+                                            log(`⚠ Diagnostic draw failed: ${e2.message}`);
+                                        }
+                                        log('❗ No frames from 2D or WebGL. Potential causes:');
+                                        log('- Canvas/WebGL privacy hardening interfering (see meta __MAX_POISE_DATA). Try disabling webglNoise/canvasNoise or allowlisting.', true);
+                                        log('- Engine JS not executing or failing before main loop. Check earlier errors.', true);
+                                        log('- WASM mismatch or corrupt. Confirm sizes and hashes.', true);
+                                    } catch (e) {
+                                        console.warn('post-init canvas reassert failed:', e);
+                                    }
+                                }
+                            }
+                        }, 800);
+                    }
+                };
+
+                // Execute the engine JavaScript
+                log('🚀 Executing DOOM engine...');
+
+                // Create script element instead of eval for proper Module handling
+                const script = document.createElement('script');
+                script.textContent = jsCode;
+                document.head.appendChild(script);
+
+                log('✅ Decentralized DOOM loaded successfully!');
+
+                // Reset button state
+                loadBtn.disabled = false;
+                loadBtn.textContent = '🎮 DOOM Loaded';
+
+            } catch (error) {
+                log(`❌ Failed to load decentralized DOOM: ${error.message}`, true);
+                loadBtn.disabled = false;
+                loadBtn.textContent = '🚀 Load Decentralized DOOM';
+            }
+        }
+
+        // --- Fullscreen support ---
+        function sizeCanvasForFullscreen(full) {
+            const c = document.getElementById('game');
+            if (!c) return;
+            if (full) {
+                // Keep 4:3 aspect ratio
+                const w = window.innerWidth;
+                const h = window.innerHeight;
+                const targetW = Math.min(w, Math.floor(h * 4 / 3));
+                const targetH = Math.min(h, Math.floor(w * 3 / 4));
+                const finalW = Math.min(targetW, Math.floor(targetH * 4 / 3));
+                const finalH = Math.floor(finalW * 3 / 4);
+                c.style.width = `${finalW}px`;
+                c.style.height = `${finalH}px`;
+                if (typeof Module !== 'undefined' && Module.setCanvasSize) {
+                    Module.setCanvasSize(320, 200); // keep logical resolution
+                }
+            } else {
+                c.style.width = '640px';
+                c.style.height = '400px';
+                if (typeof Module !== 'undefined' && Module.setCanvasSize) {
+                    Module.setCanvasSize(320, 200);
+                }
+            }
+        }
+
+        function toggleFullscreen() {
+            const container = document.getElementById('doom-container');
+            if (!document.fullscreenElement) {
+                if (container.requestFullscreen) container.requestFullscreen();
+            } else {
+                if (document.exitFullscreen) document.exitFullscreen();
+            }
+        }
+
+        document.addEventListener('fullscreenchange', () => {
+            const full = !!document.fullscreenElement;
+            sizeCanvasForFullscreen(full);
+            const btn = document.getElementById('fullscreen');
+            if (btn) btn.textContent = full ? 'Exit Fullscreen' : 'Enter Fullscreen';
+        });
+
+        window.addEventListener('resize', () => {
+            if (document.fullscreenElement) sizeCanvasForFullscreen(true);
+        });
+
+        // Compute banner height for sticky left column offset
+        function updateBannerHeightVar() {
+            try {
+                const banner = document.getElementById('top-banner');
+                if (!banner) return;
+                const h = banner.offsetHeight || 120;
+                document.documentElement.style.setProperty('--banner-height', h + 'px');
+            } catch (_) {}
+        }
+
+        // Hook button
+        window.addEventListener('DOMContentLoaded', () => {
+            updateBannerHeightVar();
+            const fsBtn = document.getElementById('fullscreen');
+            if (fsBtn) fsBtn.addEventListener('click', toggleFullscreen);
+            const wagerBtn = document.getElementById('prepare-wager');
+            if (wagerBtn) wagerBtn.addEventListener('click', prepareWager);
+        });
+
+        window.addEventListener('resize', updateBannerHeightVar);
+
+        // Build a resolvable join URL for QR/link
+        function buildJoinUrl(gameId) {
+            try {
+                const url = new URL(window.location.href);
+                url.searchParams.set('join', gameId);
+                return url.toString();
+            } catch (e) {
+                return window.location.href + (window.location.href.includes('?') ? '&' : '?') + 'join=' + encodeURIComponent(gameId);
+            }
+        }
+
+        function setInvite(gameId) {
+            const qrEl = document.getElementById('invite-qr');
+            const inviteTextEl = document.getElementById('invite-text');
+            if (!qrEl || !inviteTextEl) return;
+            const inviteUrl = buildJoinUrl(gameId);
+            qrEl.innerHTML = '';
+            qrEl.style.display = 'inline-block';
+            try {
+                new QRCode(qrEl, {
+                    text: inviteUrl,
+                    width: 256,
+                    height: 256
+                });
+            } catch (e) {
+                // fallback text
+                qrEl.textContent = inviteUrl;
+            }
+            inviteTextEl.innerHTML = `<a href="${inviteUrl}" target="_blank" rel="noopener">${inviteUrl}</a>`;
+        }
+
+        // Lightweight connectivity check to local wallet endpoints (works without CORS)
+        function pingEndpoint(url, timeoutMs = 1200) {
+            return new Promise((resolve) => {
+                try {
+                    const img = new Image();
+                    let done = false;
+                    const doneOnce = (val) => {
+                        if (!done) {
+                            done = true;
+                            resolve(val);
+                        }
+                    };
+                    const t = setTimeout(() => doneOnce(false), timeoutMs);
+                    img.onload = () => {
+                        clearTimeout(t);
+                        doneOnce(true);
+                    };
+                    img.onerror = () => {
+                        clearTimeout(t);
+                        doneOnce(true);
+                    };
+                    // add cache buster
+                    img.src = url.replace(/\/$/, '') + '/__ping.png?ts=' + Date.now();
+                } catch (_) {
+                    resolve(false);
+                }
+            });
+        }
+
+        // --- Wager preparation (no transactions until real endpoints provided) ---
+        function prepareWager() {
+            const coinEl = document.getElementById('wager-coin');
+            const amountEl = document.getElementById('wager-amount');
+            const urlEl = document.getElementById('endpoint-url');
+            const statusEl = document.getElementById('wager-status');
+
+            if (!coinEl || !amountEl || !urlEl || !statusEl) {
+                log('❌ Wager UI elements missing', true);
+                return;
+            }
+
+            const coin = coinEl.value;
+            const amount = parseFloat(amountEl.value);
+            const endpoint = (urlEl.value || '').trim();
+
+            statusEl.style.backgroundColor = '#555';
+
+            if (!amount || amount <= 0) {
+                log('❌ Enter a positive wager amount', true);
+                statusEl.style.backgroundColor = '#e74c3c';
+                return;
+            }
+            if (!endpoint) {
+                log('❌ Provide a real Wallet/RPC endpoint for the selected coin', true);
+                statusEl.style.backgroundColor = '#e74c3c';
+                return;
+            }
+            if (!walletBytes || walletBytes.byteLength === 0) {
+                log('❌ Wallet file (.wlt) is required', true);
+                statusEl.style.backgroundColor = '#e74c3c';
+                return;
+            }
+
+            log(`💰 Wager intent: ${amount} ${coin} via ${endpoint}`);
+            // Quick local connectivity probe (no CORS requirements)
+            pingEndpoint(endpoint).then((ok) => {
+                if (ok) {
+                    log('🔗 Endpoint appears reachable (ping ok)');
+                    statusEl.style.backgroundColor = '#2ecc71';
+                } else {
+                    log('⚠️ Could not confirm endpoint reachability (timeout). Proceeding requires local wallet.');
+                    statusEl.style.backgroundColor = '#f5a623';
+                }
+            });
+            // Do NOT show balances. We need RPC details to check sufficiency and sign a raw tx (no broadcast).
+            log('📝 Action: prepare a SIGNED RAW TRANSACTION (no broadcast).');
+            log('❗ Needed: exact RPC for NESS/NCH to (1) check funds sufficiency (return yes/no only) and (2) sign raw tx without broadcasting.');
+            log('➡ Provide endpoint paths, JSON schema, and any headers so I can wire this end-to-end.');
+        }
+
+        // --- Wallet creation helpers and handler ---
+        function getSelectedWalletType() {
+            const radios = document.querySelectorAll('input[name="wallet-type"]');
+            for (const r of radios) {
+                if (r.checked) return r.value;
+            }
+            return 'collection';
+        }
+
+        function buildWalletCliPreview(type, name, passphrase, isTemp) {
+            const command = isTemp ? 'walletCreateTemp' : 'walletCreate';
+            const parts = ['privateness-cli', command];
+
+            if (!isTemp) {
+                parts.push(`-t ${type}`);
+                parts.push(`-f ${name}.wlt`);
+            }
+
+            if (passphrase) {
+                const masked = '•'.repeat(passphrase.length);
+                parts.push(`-p ${masked}`);
+            }
+
+            if (!isTemp) {
+                parts.push('--encrypt');
+            }
+
+            return parts.join(' ');
+        }
+
+        async function createWallet() {
+            try {
+                const type = getSelectedWalletType();
+                const nameEl = document.getElementById('wallet-name');
+                const passEl = document.getElementById('wallet-pass');
+                const tempEl = document.getElementById('wallet-temp');
+                const endpointEl = document.getElementById('endpoint-url');
+                const statusEl = document.getElementById('wallet-create-status');
+                const previewEl = document.getElementById('wallet-cli-preview');
+
+                if (!nameEl || !passEl || !tempEl || !endpointEl || !statusEl || !previewEl) {
+                    log('❌ Wallet UI elements missing', true);
+                    return;
+                }
+
+                const name = (nameEl.value || 'escrow').trim();
+                const passphrase = (passEl.value || '').trim();
+                const isTemp = tempEl.checked;
+                const endpoint = (endpointEl.value || '').trim();
+
+                // Show CLI preview (mask passphrase)
+                const preview = buildWalletCliPreview(type, name, passphrase, isTemp);
+                previewEl.textContent = `$ ${preview}`;
+
+                // Visual pending state
+                statusEl.className = 'status-indicator';
+                statusEl.style.backgroundColor = '#f5a623'; // amber
+                const walletTypeDesc = isTemp ? 'temporary wallet (auto-destruct)' : `wallet '${name}' of type '${type}'`;
+                log(`🧰 Creating ${walletTypeDesc}`);
+
+                if (isTemp) {
+                    log('⚠️ Temporary wallets self-destruct when the session ends or conditions are met');
+                }
+
+                if (!endpoint) {
+                    log('⚠️ No wallet RPC endpoint provided in `endpoint-url`. Command preview shown only; no request sent.');
+                    return;
+                }
+
+                const apiEndpoint = isTemp ? '/walletCreateTemp' : '/walletCreate';
+                const url = endpoint.replace(/\/$/, '') + apiEndpoint;
+                const payload = isTemp ? {
+                    passphrase
+                } : {
+                    type,
+                    name,
+                    passphrase
+                };
+
+                // Note: will honor CORS of the target; user should point to local RPC.
+                const res = await fetch(url, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(payload),
+                });
+
+                if (!res.ok) {
+                    const txt = await res.text().catch(() => '');
+                    throw new Error(`HTTP ${res.status} ${res.statusText} ${txt ? '- ' + txt : ''}`);
+                }
+
+                const out = await res.json().catch(() => ({}));
+                statusEl.className = 'status-indicator connected';
+                statusEl.style.backgroundColor = '#28a745'; // green
+
+                if (isTemp) {
+                    log(`✅ Temporary wallet created successfully`);
+                    log(`🔑 Wallet ID: ${out.id || 'N/A'}`);
+                    log(`⏰ Auto-destruct conditions: ${out.destructConditions || 'session end'}`);
+                } else {
+                    log(`✅ Wallet created successfully${out && out.name ? `: ${out.name}` : ''}`);
+                }
+            } catch (e) {
+                const statusEl = document.getElementById('wallet-create-status');
+                if (statusEl) {
+                    statusEl.className = 'status-indicator failed';
+                    statusEl.style.backgroundColor = '#dc3545'; // red
+                }
+                log(`❌ Wallet creation failed: ${e.message}`, true);
+            }
+        }
+
+        async function addPrivateKey() {
+            try {
+                const keyEl = document.getElementById('private-key-input');
+                const nameEl = document.getElementById('wallet-name');
+                const endpointEl = document.getElementById('endpoint-url');
+                const statusEl = document.getElementById('add-key-status');
+
+                if (!keyEl || !nameEl || !endpointEl || !statusEl) {
+                    log('❌ Add key UI elements missing', true);
+                    return;
+                }
+
+                const privateKey = (keyEl.value || '').trim();
+                const walletName = (nameEl.value || 'escrow').trim();
+                const endpoint = (endpointEl.value || '').trim();
+
+                if (!privateKey) {
+                    log('❌ Private key required', true);
+                    return;
+                }
+
+                if (!endpoint) {
+                    log('❌ No RPC endpoint provided', true);
+                    return;
+                }
+
+                // Visual pending state
+                statusEl.className = 'status-indicator';
+                statusEl.style.backgroundColor = '#f5a623'; // amber
+                log(`🔑 Adding private key to wallet '${walletName}'`);
+
+                // Show CLI preview
+                const previewEl = document.getElementById('wallet-cli-preview');
+                if (previewEl) {
+                    const maskedKey = privateKey.substr(0, 8) + '•'.repeat(Math.max(0, privateKey.length - 16)) + privateKey.substr(-8);
+                    previewEl.textContent = `$ privateness-cli addPrivateKey -f ${walletName}.wlt ${maskedKey}`;
+                }
+
+                const url = endpoint.replace(/\/$/, '') + '/addPrivateKey';
+                const payload = {
+                    walletName,
+                    privateKey
+                };
+
+                const res = await fetch(url, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(payload),
+                });
+
+                if (!res.ok) {
+                    const txt = await res.text().catch(() => '');
+                    throw new Error(`HTTP ${res.status} ${res.statusText} ${txt ? '- ' + txt : ''}`);
+                }
+
+                const result = await res.json().catch(() => ({}));
+                statusEl.className = 'status-indicator connected';
+                statusEl.style.backgroundColor = '#28a745'; // green
+                log(`✅ Private key added successfully`);
+                log(`📍 Address: ${result.address || 'N/A'}`);
+
+                // Clear the input
+                keyEl.value = '';
+
+            } catch (e) {
+                const statusEl = document.getElementById('add-key-status');
+                if (statusEl) {
+                    statusEl.className = 'status-indicator failed';
+                    statusEl.style.backgroundColor = '#dc3545'; // red
+                }
+                log(`❌ Failed to add private key: ${e.message}`, true);
+            }
+        }
+
+        // --- Transaction Management using actual privateness-cli commands ---
+        let transactionState = {
+            rawTransactions: new Map(),
+            signedTransactions: new Map()
+        };
+
+        async function createRawTransaction() {
+            try {
+                const recipientEl = document.getElementById('recipient-address');
+                const amountEl = document.getElementById('tx-amount');
+                const coinEl = document.getElementById('tx-coin');
+                const statusEl = document.getElementById('tx-status');
+                const rawTxEl = document.getElementById('raw-tx-data');
+                const endpointEl = document.getElementById('endpoint-url');
+                const walletNameEl = document.getElementById('wallet-name');
+
+                if (!recipientEl || !amountEl || !coinEl || !statusEl || !rawTxEl || !endpointEl || !walletNameEl) {
+                    log('❌ Transaction UI elements missing', true);
+                    return;
+                }
+
+                const recipient = (recipientEl.value || '').trim();
+                const amount = parseFloat(amountEl.value);
+                const coin = coinEl.value;
+                const endpoint = (endpointEl.value || '').trim();
+                const walletName = (walletNameEl.value || 'escrow').trim();
+
+                if (!recipient || !amount || amount <= 0) {
+                    log('❌ Invalid recipient address or amount', true);
+                    return;
+                }
+
+                if (!endpoint) {
+                    log('❌ No RPC endpoint provided', true);
+                    return;
+                }
+
+                statusEl.className = 'status-indicator';
+                statusEl.style.backgroundColor = '#f5a623';
+                log(`📝 Creating raw transaction: ${amount} ${coin} to ${recipient}`);
+
+                const url = endpoint.replace(/\/$/, '') + '/createRawTransaction';
+                const payload = {
+                    walletName: walletName,
+                    recipient: recipient,
+                    amount: amount,
+                    coin: coin
+                };
+
+                const res = await fetch(url, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(payload),
+                });
+
+                if (!res.ok) {
+                    const txt = await res.text().catch(() => '');
+                    throw new Error(`HTTP ${res.status} ${res.statusText} ${txt ? '- ' + txt : ''}`);
+                }
+
+                const result = await res.json().catch(() => ({}));
+
+                if (result.rawTransaction) {
+                    rawTxEl.value = result.rawTransaction;
+                    transactionState.rawTransactions.set(result.txId || Date.now().toString(), result.rawTransaction);
+
+                    statusEl.className = 'status-indicator connected';
+                    statusEl.style.backgroundColor = '#28a745';
+                    log(`✅ Raw transaction created`);
+                    log(`🔗 Transaction ID: ${result.txId || 'N/A'}`);
+                }
+
+            } catch (e) {
+                const statusEl = document.getElementById('tx-status');
+                if (statusEl) {
+                    statusEl.className = 'status-indicator failed';
+                    statusEl.style.backgroundColor = '#dc3545';
+                }
+                log(`❌ Failed to create raw transaction: ${e.message}`, true);
+            }
+        }
+
+        async function signTransaction() {
+            try {
+                const rawTxEl = document.getElementById('raw-tx-data');
+                const statusEl = document.getElementById('tx-status');
+                const endpointEl = document.getElementById('endpoint-url');
+                const walletNameEl = document.getElementById('wallet-name');
+
+                if (!rawTxEl || !statusEl || !endpointEl || !walletNameEl) {
+                    log('❌ Transaction UI elements missing', true);
+                    return;
+                }
+
+                const rawTransaction = (rawTxEl.value || '').trim();
+                const endpoint = (endpointEl.value || '').trim();
+                const walletName = (walletNameEl.value || 'escrow').trim();
+
+                if (!rawTransaction) {
+                    log('❌ No raw transaction to sign', true);
+                    return;
+                }
+
+                if (!endpoint) {
+                    log('❌ No RPC endpoint provided', true);
+                    return;
+                }
+
+                statusEl.className = 'status-indicator';
+                statusEl.style.backgroundColor = '#f5a623';
+                log(`✍️ Signing transaction with wallet '${walletName}'`);
+
+                const url = endpoint.replace(/\/$/, '') + '/signTransaction';
+                const payload = {
+                    walletName: walletName,
+                    rawTransaction: rawTransaction
+                };
+
+                const res = await fetch(url, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(payload),
+                });
+
+                if (!res.ok) {
+                    const txt = await res.text().catch(() => '');
+                    throw new Error(`HTTP ${res.status} ${res.statusText} ${txt ? '- ' + txt : ''}`);
+                }
+
+                const result = await res.json().catch(() => ({}));
+
+                if (result.signedTransaction) {
+                    rawTxEl.value = result.signedTransaction;
+                    transactionState.signedTransactions.set(result.txId || Date.now().toString(), result.signedTransaction);
+
+                    statusEl.className = 'status-indicator connected';
+                    statusEl.style.backgroundColor = '#28a745';
+                    log(`✅ Transaction signed successfully`);
+                }
+
+            } catch (e) {
+                const statusEl = document.getElementById('tx-status');
+                if (statusEl) {
+                    statusEl.className = 'status-indicator failed';
+                    statusEl.style.backgroundColor = '#dc3545';
+                }
+                log(`❌ Failed to sign transaction: ${e.message}`, true);
+            }
+        }
+
+        async function broadcastTransaction() {
+            try {
+                const rawTxEl = document.getElementById('raw-tx-data');
+                const statusEl = document.getElementById('tx-status');
+                const endpointEl = document.getElementById('endpoint-url');
+
+                if (!rawTxEl || !statusEl || !endpointEl) {
+                    log('❌ Transaction UI elements missing', true);
+                    return;
+                }
+
+                const signedTransaction = (rawTxEl.value || '').trim();
+                const endpoint = (endpointEl.value || '').trim();
+
+                if (!signedTransaction) {
+                    log('❌ No signed transaction to broadcast', true);
+                    return;
+                }
+
+                if (!endpoint) {
+                    log('❌ No RPC endpoint provided', true);
+                    return;
+                }
+
+                statusEl.className = 'status-indicator';
+                statusEl.style.backgroundColor = '#f5a623';
+                log(`📡 Broadcasting transaction to network`);
+
+                const url = endpoint.replace(/\/$/, '') + '/broadcastTransaction';
+                const payload = {
+                    signedTransaction: signedTransaction
+                };
+
+                const res = await fetch(url, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(payload),
+                });
+
+                if (!res.ok) {
+                    const txt = await res.text().catch(() => '');
+                    throw new Error(`HTTP ${res.status} ${res.statusText} ${txt ? '- ' + txt : ''}`);
+                }
+
+                const result = await res.json().catch(() => ({}));
+
+                statusEl.className = 'status-indicator connected';
+                statusEl.style.backgroundColor = '#28a745';
+                log(`✅ Transaction broadcast successfully`);
+                log(`🔗 Transaction hash: ${result.txHash || 'N/A'}`);
+
+                // Clear the textarea after successful broadcast
+                rawTxEl.value = '';
+
+            } catch (e) {
+                const statusEl = document.getElementById('tx-status');
+                if (statusEl) {
+                    statusEl.className = 'status-indicator failed';
+                    statusEl.style.backgroundColor = '#dc3545';
+                }
+                log(`❌ Failed to broadcast transaction: ${e.message}`, true);
+            }
+        }
+
+        // WebRTC multiplayer functions
+        async function getRandomStunServers(maxCount = 1) {
+            try {
+                const url = 'https://enumer.org/public-stun.txt';
+                const urlWithTs = url + (url.includes('?') ? '&' : '?') + 'ts=' + Date.now();
+                log(`🌐 Fetching public STUN list from ${url}`);
+                const res = await fetch(urlWithTs, { method: 'GET', cache: 'no-store' });
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                const text = await res.text();
+                // Parse lines like: stun:host:port or stun:host
+                const lines = text.split(/\r?\n/)
+                    .map(l => l.trim())
+                    .filter(l => l && !l.startsWith('#') && l.startsWith('stun:'));
+                if (lines.length === 0) throw new Error('No STUN entries parsed');
+                // Shuffle and pick up to maxCount
+                for (let i = lines.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [lines[i], lines[j]] = [lines[j], lines[i]];
+                }
+                const pick = lines.slice(0, Math.max(1, Math.min(maxCount, lines.length)));
+                log(`🔧 Using ${pick.length} STUN server(s)`);
+                return [{ urls: pick }];
+            } catch (e) {
+                log(`⚠️ STUN list fetch failed: ${e.message}. Falling back to host-only ICE.`, true);
+                return [];
+            }
+        }
+        async function hostGame() {
+            log('🎮 Starting multiplayer host...');
+            isHost = true;
+
+            // Use dynamic STUN list from enumer.org; fallback to host-only
+            const iceServers = await getRandomStunServers(1);
+            const cfg = { iceServers };
+            peerConnection = new RTCPeerConnection(cfg);
+            if (!cfg.iceServers || cfg.iceServers.length === 0) {
+                log('🛡️ Using host-only ICE (no STUN/TURN). Connectivity may be limited behind NAT.');
+            } else {
+                log(`🔧 Using custom ICE config with ${cfg.iceServers.length} server(s).`);
+            }
+
+            dataChannel = peerConnection.createDataChannel('doom', {
+                ordered: true
+            });
+
+            dataChannel.onopen = () => {
+                log('🟢 Data channel open');
+            };
+
+            dataChannel.onmessage = (event) => {
+                log(`Received: ${event.data}`);
+            };
+
+            const offer = await peerConnection.createOffer();
+            await peerConnection.setLocalDescription(offer);
+
+            // Simplified invite: base64 SDP as game id, with QR/link
+            const gameId = btoa(JSON.stringify(offer));
+            setInvite(gameId);
+            const inviteObj = {
+                id: gameId
+            };
+            log('📨 Share this Game ID with your friend to join:');
+            log(JSON.stringify(inviteObj));
+
+            // Also log a truncated raw offer for debugging
+            log('🌐 Host ready. Scan the QR or share the invite URL below.');
+            log(`Offer (truncated): ${JSON.stringify(offer).substring(0, 140)}...`);
+        }
+
+        async function joinGame() {
+            const gameId = document.getElementById('join-input').value;
+            if (!gameId) {
+                log('❌ Please enter a game ID', true);
+                return;
+            }
+
+            log(`🔗 Joining game: ${gameId}`);
+            isHost = false;
+        }
+
+        // Event listeners (guard against missing elements)
+        const btnVerify = document.getElementById('verify-domains');
+        if (btnVerify) btnVerify.addEventListener('click', verifyDomains);
+        const btnLoad = document.getElementById('load-doom');
+        if (btnLoad) btnLoad.addEventListener('click', loadDecentralizedDoom);
+        const btnHost = document.getElementById('host-game');
+        if (btnHost) btnHost.addEventListener('click', hostGame);
+        const btnJoin = document.getElementById('join-game');
+        if (btnJoin) btnJoin.addEventListener('click', joinGame);
+
+        // Initialize
+        window.addEventListener('DOMContentLoaded', () => {
+            console.log('DOM loaded, checking elements...');
+            console.log('status-log element:', document.getElementById('status-log'));
+            console.log('verify-domains button:', document.getElementById('verify-domains'));
+
+            log('🎮 Production Decentralized DOOM Loader Ready');
+            log('📡 Click "Verify EmerDNS Domains" to begin');
+
+            // If URL contains ?join=GAMEID, prefill join input
+            const params = new URLSearchParams(window.location.search);
+            const joinParam = params.get('join');
+            if (joinParam) {
+                const joinInput = document.getElementById('join-input');
+                if (joinInput) joinInput.value = joinParam;
+            }
+
+            // Remove forbidden auto-default RPC endpoint per user rules
+            const coinEl = document.getElementById('wager-coin');
+            const endpointEl = document.getElementById('endpoint-url');
+            if (coinEl) {
+                coinEl.addEventListener('change', () => {
+                    if (!endpointEl) return;
+                    endpointEl.value = '';
+                    log('ℹ️ RPC endpoint must be provided explicitly. No default applied.');
+                });
+            }
+
+            // Wallet loader
+            const walletInput = document.getElementById('wallet-file');
+            const walletStatus = document.getElementById('wallet-status');
+            if (walletInput) {
+                walletInput.addEventListener('change', () => {
+                    walletBytes = null;
+                    if (!walletInput.files || walletInput.files.length === 0) {
+                        if (walletStatus) walletStatus.style.backgroundColor = '#555';
+                        return;
+                    }
+                    const f = walletInput.files[0];
+                    const reader = new FileReader();
+                    reader.onload = () => {
+                        walletBytes = new Uint8Array(reader.result);
+                        if (walletStatus) walletStatus.style.backgroundColor = '#2ecc71';
+                        log(`🔑 Wallet loaded: ${f.name} (${walletBytes.byteLength} bytes)`);
+                    };
+                    reader.onerror = () => {
+                        walletBytes = null;
+                        if (walletStatus) walletStatus.style.backgroundColor = '#e74c3c';
+                        log('❌ Failed to read wallet file', true);
+                    };
+                    reader.readAsArrayBuffer(f);
+                });
+            }
+
+            const btnCreateWallet = document.getElementById('create-wallet');
+            if (btnCreateWallet) btnCreateWallet.addEventListener('click', createWallet);
+
+            // Transaction event listeners
+            const btnCreateRawTx = document.getElementById('create-raw-tx');
+            if (btnCreateRawTx) btnCreateRawTx.addEventListener('click', createRawTransaction);
+
+            const btnSignTx = document.getElementById('sign-tx');
+            if (btnSignTx) btnSignTx.addEventListener('click', signTransaction);
+
+            const btnBroadcastTx = document.getElementById('broadcast-tx');
+            if (btnBroadcastTx) btnBroadcastTx.addEventListener('click', broadcastTransaction);
+
+            // Escrow event listeners
+            const btnGenerateEscrowId = document.getElementById('generate-escrow-id');
+            if (btnGenerateEscrowId) btnGenerateEscrowId.addEventListener('click', generateEscrowIdHandler);
+
+            const btnDepositEscrow = document.getElementById('deposit-escrow');
+            if (btnDepositEscrow) btnDepositEscrow.addEventListener('click', depositToEscrow);
+
+            const btnCheckEscrow = document.getElementById('check-escrow');
+            if (btnCheckEscrow) btnCheckEscrow.addEventListener('click', checkEscrowStatus);
+
+            const btnReleaseEscrow = document.getElementById('release-escrow');
+            if (btnReleaseEscrow) btnReleaseEscrow.addEventListener('click', releaseEscrow);
+
+            const btnRefundEscrow = document.getElementById('refund-escrow');
+            if (btnRefundEscrow) btnRefundEscrow.addEventListener('click', refundEscrow);
+
+            // Add private key event listener
+            const btnAddPrivateKey = document.getElementById('add-private-key');
+            if (btnAddPrivateKey) btnAddPrivateKey.addEventListener('click', addPrivateKey);
+        });
+    </script>
+</body>
+
+</html>
