@@ -1,0 +1,212 @@
+<p>
+  ╔══════════════════════════════════════════════════════════════════════════════════════╗
+</p>
+<p>║ NESS HUB — LBRTYnet Community Node (hardened) ║</p>
+<p>║ docker-compose · ness-network bridge · ICC disabled ║</p>
+<p>
+  ╚══════════════════════════════════════════════════════════════════════════════════════╝
+</p>
+<p>&nbsp;</p>
+<p>INTERNET / WAN</p>
+<p>│</p>
+<p>├──:443/udp ──────── WireGuard ingress (PUBLIC — intentional)</p>
+<p>├──:42424/udp ─────── LBRTYnet peer discovery (PUBLIC — mesh bootstrap)</p>
+<p>├──:6661 ──────────── Emercoin P2P (PUBLIC — blockchain sync)</p>
+<p>├──:2222 ──────────── SSH / EmerSSH PKI (PUBLIC — pubkey+NVS only)</p>
+<p>├──:8000 ──────────── Skywire visor (PUBLIC — consider VPN-only)</p>
+<p>└──:1053/udp+tcp ──── NVS DNS resolver (PUBLIC — for local clients)</p>
+<p>✗ all other ports ── bound to 127.0.0.1 (BLOCKED from internet)</p>
+<p>&nbsp;</p>
+<p>
+  ┌──────────────────────────────────────────────────────────────────────────────────────┐
+</p>
+<p>│ TIER 0 — Network Substrate │</p>
+<p>│ │</p>
+<p>
+  │
+  ┌────────────────────────────────────────────────────────────────────────────────┐
+  │
+</p>
+<p>│ │ lbrtynet own netns · ness-network bridge │ │</p>
+<p>│ │ │ │</p>
+<p>│ │ weave -d -v │ │</p>
+<p>│ │ nanomsg BUS 127.0.0.1:5555 ← loopback only │ │</p>
+<p>│ │ peer disc :42424/udp ← public │ │</p>
+<p>│ │ /opt/lbrty/blades/*.so ← future EMC/SKY/AGORA blades │ │</p>
+<p>│ │ │ │</p>
+<p>│ │ cap_drop:ALL cap_add:NET_ADMIN no-new-privileges │ │</p>
+<p>│ │ HEALTHCHECK: nc -z 127.0.0.1 5555 │ │</p>
+<p>
+  │
+  └────────────────────────────┬───────────────────────────────────────────────────┘
+  │
+</p>
+<p>│ │ service_healthy │</p>
+<p>
+  │
+  ┌────────────────────────────▼───────────────────────────────────────────────────┐
+  │
+</p>
+<p>│ │ softether-vpn THE shared network namespace for all services │ │</p>
+<p>│ │ │ │</p>
+<p>│ │ WireGuard/SoftEther :443/udp ← public │ │</p>
+<p>│ │ admin RPC 127.0.0.1:5556 ← loopback only │ │</p>
+<p>│ │ tun · NET_ADMIN · SYS_MODULE · IPv6 fwd │ │</p>
+<p>
+  │ │ no-new-privileges · password required at start (:? hard-fail if unset) │ │
+</p>
+<p>│ │ │ │</p>
+<p>
+  │ │ ALL port bindings for child services declared here ───────────────────┐ │
+  │
+</p>
+<p>
+  │
+  └────────────────────────────────────────────────────────────────────────┼──────┘
+  │
+</p>
+<p>
+  └───────────────────────────────────────────────────────────────────────────┼──────────┘
+</p>
+<p>│</p>
+<p>network_mode: service:softether-vpn (shared loopback 127.x) │</p>
+<p>┌─────────────────────────────────────────────────────────────┘</p>
+<p>▼</p>
+<p>
+  ┌─────────────────────────────────────────────────────────────────────────────────────┐
+</p>
+<p>│ TIER 1 — Core Services (always · all profiles) │</p>
+<p>│ all inter-service calls are 127.0.0.1 — no DNS, no bridge traversal │</p>
+<p>│ │</p>
+<p>
+  │ ┌──────────────────────────┐
+  ┌──────────────────────────────────────────────────┐ │
+</p>
+<p>│ │ emercoin-core │ │ ssh-gateway (custom build + emcssh) │ │</p>
+<p>│ │ │ │ │ │</p>
+<p>│ │ P2P :6661 ← public │ │ sshd :2222 ← public, Ed25519 only │ │</p>
+<p>│ │ RPC 127.0.0.1:6662 │ │ AuthorizedKeysCommand /usr/sbin/emcssh %u │ │</p>
+<p>│ │ NVS blockchain DNS │ │ │ │</p>
+<p>│ │ │ │ Key lookup chain: │ │</p>
+<p>│ │ no-new-privileges │ │ 1→ emercoin RPC 127.0.0.1:6662 │ │</p>
+<p>
+  │ └──────────────┬───────────┘ │ 2→ emerapi.info GraphQL POST /graphql │ │
+</p>
+<p>│ │ │ 3→ explorer.emercoin.com/nvs │ │</p>
+<p>│ │ │ │ │</p>
+<p>│ ┌──────────────▼───────────┐ │ read_only FS · tmpfs /tmp noexec │ │</p>
+<p>│ │ dns-reverse-proxy │ │ no-new-privileges │ │</p>
+<p>│ │ │ │ AllowTcpForwarding NO (no pivot) │ │</p>
+<p>│ │ NVS→DNS :1053 ← public│ │ MaxAuthTries 3 · LoginGraceTime 20s │ │</p>
+<p>│ │ API 127.0.0.1:8053 │ │ curve25519 + ChaCha20/AES-GCM only │ │</p>
+<p>│ │ │ └──────────────────────────────────────────────────┘ │</p>
+<p>│ │ read_only · tmpfs /tmp │ │</p>
+<p>
+  │ │ no-new-privileges │ ┌──────────────────────────────────────────────────┐ │
+</p>
+<p>│ └──────────────────────────┘ │ skywire (NESS visor) │ │</p>
+<p>│ │ │ │</p>
+<p>│ ┌──────────────────────────┐ │ visor :8000 ← public │ │</p>
+<p>│ │ privateness │ │ no-new-privileges │ │</p>
+<p>│ │ │ └──────────────────────────────────────────────────┘ │</p>
+<p>│ │ P2P (internal only) │ │</p>
+<p>
+  │ │ RPC 127.0.0.1:6660 │ ┌──────────────────────────────────────────────────┐
+  │
+</p>
+<p>│ │ no-new-privileges │ │ pyuheprng-privatenesstools │ │</p>
+<p>│ └──────────────────────────┘ │ │ │</p>
+<p>│ │ entropy 127.0.0.1:5550 │ │</p>
+<p>│ │ tools 127.0.0.1:8888 │ │</p>
+<p>│ │ read_only · tmpfs /tmp noexec │ │</p>
+<p>│ │ no-new-privileges │ │</p>
+<p>│ └──────────────────────────────────────────────────┘ │</p>
+<p>
+  └─────────────────────────────────────────────────────────────────────────────────────┘
+</p>
+<p>&nbsp;</p>
+<p>
+  ┌─────────────────────────────────────────────────────────────────────────────────────┐
+</p>
+<p>│ TIER 2 — Optional Overlay Routes profile: [overlay | full] │</p>
+<p>│ │</p>
+<p>
+  │
+  ┌──────────────────────────────────────────────────────────────────────────────┐
+  │
+</p>
+<p>│ │ yggdrasil E2E IPv6 overlay │ │</p>
+<p>│ │ 127.0.0.1:9001 peers arrive via lbrtynet mesh, not raw internet │ │</p>
+<p>│ │ cap_drop:ALL cap_add:NET_ADMIN no-new-privileges │ │</p>
+<p>
+  │
+  └─────────────────────────────┬────────────────────────────────────────────────┘
+  │
+</p>
+<p>│ │ service_started │</p>
+<p>
+  │
+  ┌─────────────────────────────▼────────────────────────────────────────────────┐
+  │
+</p>
+<p>│ │ i2p-yggdrasil garlic routing │ │</p>
+<p>│ │ console 127.0.0.1:7657 proxy 127.0.0.1:4444 ← loopback only │ │</p>
+<p>│ │ cap_drop:ALL cap_add:NET_ADMIN,SYS_MODULE no-new-privileges │ │</p>
+<p>
+  │
+  └──────────────────────────────────────────────────────────────────────────────┘
+  │
+</p>
+<p>
+  └─────────────────────────────────────────────────────────────────────────────────────┘
+</p>
+<p>&nbsp;</p>
+<p>
+  ┌─────────────────────────────────────────────────────────────────────────────────────┐
+</p>
+<p>│ FUTURE — LBRTYnet Blade Plugins (drop .so → /opt/lbrty/blades/) │</p>
+<p>│ connect via nanomsg BUS 127.0.0.1:5555 │</p>
+<p>│ │</p>
+<p>│ emercoin_transport.so P2P over mesh · Agora payments │</p>
+<p>│ emercoin_notary.so NVS-backed identity / notarization │</p>
+<p>│ skywire_bridge.so dmsg/skynet relay over LBRTYnet │</p>
+<p>│ agora_marketplace.so multi-currency (EMC + NESS + BTC) │</p>
+<p>
+  └─────────────────────────────────────────────────────────────────────────────────────┘
+</p>
+<p>&nbsp;</p>
+<p>
+  ───────────────────────── SECURITY POSTURE SUMMARY
+  ──────────────────────────────────
+</p>
+<p>&nbsp;</p>
+<p>WHAT IS EXPOSED WHY</p>
+<p>
+  ───────────────────────── ──────────────────────────────────────────────────
+</p>
+<p>:443/udp WireGuard mesh entry point — encrypted by design</p>
+<p>:42424/udp LBRTYnet peerd peer bootstrap — UDP, no auth surface</p>
+<p>:6661 Emercoin P2P blockchain sync — public P2P protocol</p>
+<p>:2222 SSH pubkey+NVS only, Ed25519, brute-force throttled</p>
+<p>:8000 Skywire visor UI — recommend firewall to VPN clients only</p>
+<p>:1053 DNS/NVS resolver for local clients</p>
+<p>&nbsp;</p>
+<p>WHAT IS LOCKED DOWN ATTACK PREVENTED</p>
+<p>
+  ───────────────────────── ──────────────────────────────────────────────────
+</p>
+<p>RPC ports → 127.0.0.1 remote RPC exploitation, credential theft</p>
+<p>Admin RPC → 127.0.0.1 VPN server takeover</p>
+<p>I2P/Yggdrasil → 127.0.0.1 admin interface exposure</p>
+<p>pyuheprng/tools → 127.0.0.1 entropy service abuse, internal API scraping</p>
+<p>cap_drop:ALL everywhere kernel capability exploits, container escape</p>
+<p>no-new-privileges all setuid escalation after initial compromise</p>
+<p>read_only FS + noexec tmpfs malware persistence, dropper execution</p>
+<p>ICC disabled on bridge lateral movement between containers via bridge</p>
+<p>:? hard-fail on passwords accidental deployment with default credentials</p>
+<p>SSH: no TCP forwarding pivot / SOCKS proxy into internal namespace</p>
+<p>SSH: MaxAuthTries 3 brute force, credential stuffing</p>
+<p>
+  SSH: AEAD+ETM ciphers only BEAST, Lucky13, padding oracle, compression oracle
+</p>
+<p>SSH: Ed25519 only RSA factoring, DSA nonce reuse, NIST curve concerns</p>

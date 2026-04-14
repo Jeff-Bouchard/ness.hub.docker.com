@@ -77,6 +77,15 @@ Ce projet applique ce principe : on ne parie pas sur l’absence d’attaquant ;
 
 ## Images
 
+## Ports Cœur Canoniques
+
+- `emercoin-core` :
+  - `6661/TCP` = P2P
+  - `6662/TCP` = JSON-RPC
+- `privateness` :
+  - `6006/TCP` = P2P
+  - `6660/TCP` = JSON-RPC
+
 ### 1. emercoin-core
 
 Nœud blockchain Emercoin.

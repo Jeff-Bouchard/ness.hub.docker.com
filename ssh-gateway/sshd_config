@@ -1,0 +1,63 @@
+Port 2222
+AddressFamily inet
+ListenAddress 0.0.0.0
+
+# --- Host keys: Ed25519 only ---
+# Avoids: RSA <2048 weak keys, DSA (broken), ECDSA (NIST curve backdoor concerns)
+HostKey /etc/ssh/ssh_host_ed25519_key
+
+# --- Algorithm pinning ---
+# Avoids: CBC cipher modes (BEAST), MD5/SHA1 MACs, DH groups < 3072 bits,
+#         non-AEAD ciphers, arcfour/blowfish/3DES
+KexAlgorithms curve25519-sha256,curve25519-sha256@libssh.org
+Ciphers chacha20-poly1305@openssh.com,aes256-gcm@openssh.com,aes128-gcm@openssh.com
+MACs hmac-sha2-512-etm@openssh.com,hmac-sha2-256-etm@openssh.com
+HostKeyAlgorithms ssh-ed25519
+
+# --- Authentication ---
+PermitRootLogin prohibit-password
+PasswordAuthentication no
+ChallengeResponseAuthentication no
+KerberosAuthentication no
+GSSAPIAuthentication no
+PubkeyAuthentication yes
+AuthorizedKeysFile /etc/emercoin/emcssh.keys.d/%u .ssh/authorized_keys
+
+# EmerSSH blockchain PKI
+# Avoids: static key management — keys live on-chain, revoke by updating NVS record
+AuthorizedKeysCommand /usr/sbin/emcssh %u
+AuthorizedKeysCommandUser nobody
+
+# --- Brute-force / DoS mitigation ---
+# Avoids: credential stuffing, slow-loris SSH, connection exhaustion
+MaxAuthTries 3
+MaxSessions 5
+MaxStartups 5:50:10
+LoginGraceTime 20
+
+# --- Disable all forwarding ---
+# Avoids: using SSH as a pivot/proxy into the internal network namespace
+AllowTcpForwarding no
+AllowStreamLocalForwarding no
+AllowAgentForwarding no
+X11Forwarding no
+PermitTunnel no
+
+# --- Misc hardening ---
+Protocol 2
+PrintMotd no
+PrintLastLog no
+UseDNS no
+PermitUserEnvironment no
+AcceptEnv LANG LC_*
+Compression no
+StrictModes yes
+
+# --- Logging ---
+# SyslogFacility AUTH so failures appear distinctly in container logs
+SyslogFacility AUTH
+LogLevel VERBOSE
+
+# --- Keep alive ---
+ClientAliveInterval 30
+ClientAliveCountMax 2

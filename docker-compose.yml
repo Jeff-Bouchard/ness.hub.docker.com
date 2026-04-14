@@ -1,88 +1,22 @@
 services:
-  emercoin-core:
-    image: nessnetwork/emercoin-core
-    container_name: emercoin-core
-    ports:
-      - "${EMERCOIN_PORT_P2P:-6661}:6661"
-      - "${EMERCOIN_PORT_RPC:-6662}:6662"
-      
-    volumes:
-      - emercoin-data:/data
-    restart: unless-stopped
-    healthcheck:
-      # Simple liveness check: ensure main process (PID 1, emercoind) is running
-      test: ["CMD-SHELL", "kill -0 1"]
-      interval: 30s
-      timeout: 5s
-      retries: 3
-      start_period: 30s
+  # --- Tier 0: Network substrate (runs before everything) ---
 
-  yggdrasil:
-    image: nessnetwork/yggdrasil
-    container_name: yggdrasil
-    command: >
-      sh -c 'if [ ! -f /etc/yggdrasil.conf ]; then yggdrasil -genconf > /etc/yggdrasil.conf; fi;
-      exec yggdrasil -useconffile /etc/yggdrasil.conf'
+  lbrtynet:
+    build: ./lbrtynet
+    container_name: lbrtynet
     ports:
-      - "${YGGDRASIL_PORT:-9001}:9001"
+      - "42424:42424/udp"           # peer discovery — must be public for mesh bootstrap
+      - "127.0.0.1:5555:5555"       # nanomsg BUS — loopback only, never world-accessible
     volumes:
-      - yggdrasil-data:/etc/yggdrasil
+      - lbrtynet-conf:/etc/lbrtynet
+      - lbrtynet-cache:/home/frx/.lbrtynet
     restart: unless-stopped
+    cap_drop:
+      - ALL
     cap_add:
-      - NET_ADMIN
-    depends_on:
-      emercoin-core:
-        condition: service_healthy
-
-  i2p-yggdrasil:
-    image: nessnetwork/i2p-yggdrasil
-    container_name: i2p-yggdrasil
-    ports:
-      - "${I2P_CONSOLE_PORT:-7657}:7657"
-      - "${I2P_HTTP_PROXY:-4444}:4444"
-      - "${I2P_IRC_PORT:-6668}:6668"
-      - "${YGGDRASIL_ADMIN_PORT:-9002}:9002"
-    volumes:
-      - i2p-data:/var/lib/i2p
-    restart: unless-stopped
-    cap_add:
-      - NET_ADMIN
-      - SYS_MODULE
-    devices:
-      - /dev/net/tun
-    sysctls:
-      - net.ipv6.conf.all.forwarding=1
-    depends_on:
-      - yggdrasil
-
-  skywire:
-    image: nessnetwork/skywire
-    container_name: skywire
-    ports:
-      - "${SKYWIRE_PORT:-8000}:8000"
-    volumes:
-      - skywire-data:/root/.skywire
-    restart: unless-stopped
-    depends_on:
-      emercoin-core:
-        condition: service_healthy
-
-  ssh-gateway:
-    image: lscr.io/linuxserver/openssh-server:latest
-    container_name: ssh-gateway
-    env_file:
-      - ./.ssh-admin.env
-    environment:
-      - PUID=0
-      - PGID=0
-      - SUDO_ACCESS=true
-      - PASSWORD_ACCESS=true
-      - USER_NAME=root
-    ports:
-      - "${SSH_GATEWAY_PORT:-2222}:2222"
-    volumes:
-      - ssh-gateway-config:/config
-    restart: unless-stopped
+      - NET_ADMIN                   # required: tun/tap interface management
+    security_opt:
+      - no-new-privileges:true
     networks:
       - ness-network
 
@@ -90,47 +24,185 @@ services:
     build: ./softether
     container_name: softether-vpn
     environment:
-      - SOFTETHER_ADMIN_PASSWORD=${SOFTETHER_ADMIN_PASSWORD:-changeme}
+      - SOFTETHER_ADMIN_PASSWORD=${SOFTETHER_ADMIN_PASSWORD:?SOFTETHER_ADMIN_PASSWORD must be set}
       - SOFTETHER_ENABLE_WG=1
     ports:
-      - "${SOFTETHER_VPN_PORT:-443}:443/udp"
-    expose:
-      - "5555"
+      # --- PUBLIC (intentionally internet-facing) ---
+      - "${SOFTETHER_VPN_PORT:-443}:443/udp"        # WireGuard ingress — must be public
+      - "${EMERCOIN_PORT_P2P:-6661}:6661"            # Emercoin P2P — must be public for blockchain sync
+      - "${SSH_GATEWAY_PORT:-2222}:2222"             # SSH — EmerSSH PKI, pubkey-only
+      - "1053:53/udp"                                # DNS — NVS resolver for local clients
+      - "1053:53/tcp"
+      - "${SKYWIRE_PORT:-8000}:8000"                 # Skywire visor UI — consider VPN-only access
+      # --- INTERNAL ONLY (loopback-bound) ---
+      - "127.0.0.1:5556:5555"                        # SoftEther admin RPC — never expose publicly
+      - "127.0.0.1:${EMERCOIN_PORT_RPC:-6662}:6662"  # Emercoin RPC — credentials in plaintext if exposed
+      - "127.0.0.1:${PRIVATENESS_PORT_RPC:-6660}:6660" # NESS RPC — internal only
+      - "127.0.0.1:${PYUHEPRNG_PORT:-5550}:5000"    # entropy RPC — internal only
+      - "127.0.0.1:${PRIVATENESSTOOLS_PORT:-8888}:8888" # tools API — internal only
+      - "127.0.0.1:${DNS_API_PORT:-8053}:8053"       # DNS API — internal NVS queries only
+      # --- OVERLAY (only active with profile=overlay|full) ---
+      - "127.0.0.1:${YGGDRASIL_PORT:-9001}:9001"    # Yggdrasil — loopback; peers via lbrtynet mesh
+      - "127.0.0.1:${I2P_CONSOLE_PORT:-7657}:7657"  # I2P console — admin, never public
+      - "127.0.0.1:${I2P_HTTP_PROXY:-4444}:4444"    # I2P proxy — local clients only
     volumes:
       - softether-data:/usr/local/vpnserver
+    cap_drop:
+      - ALL
     cap_add:
-      - NET_ADMIN
+      - NET_ADMIN                   # required: VPN tunnel management
+      - SYS_MODULE                  # required: kernel module loading for tun/tap
+    security_opt:
+      - no-new-privileges:true
+    devices:
+      - /dev/net/tun
+    sysctls:
+      - net.ipv6.conf.all.forwarding=1
     restart: unless-stopped
     networks:
       - ness-network
     depends_on:
+      lbrtynet:
+        condition: service_healthy
+
+  # --- Tier 1+ services ---
+
+  emercoin-core:
+    image: nessnetwork/emercoin-core
+    container_name: emercoin-core
+    network_mode: "service:softether-vpn"
+    volumes:
+      - emercoin-data:/data
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    depends_on:
+      softether-vpn:
+        condition: service_started
+    healthcheck:
+      test: ["CMD-SHELL", "kill -0 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
+  # --- Optional overlay routes (Tier 2 / full profile only) ---
+
+  yggdrasil:
+    image: nessnetwork/yggdrasil
+    container_name: yggdrasil
+    network_mode: "service:softether-vpn"
+    command: >
+      sh -c 'if [ ! -f /etc/yggdrasil.conf ]; then yggdrasil -genconf > /etc/yggdrasil.conf; fi;
+      exec yggdrasil -useconffile /etc/yggdrasil.conf'
+    volumes:
+      - yggdrasil-data:/etc/yggdrasil
+    restart: unless-stopped
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_ADMIN
+    security_opt:
+      - no-new-privileges:true
+    profiles: [overlay, full]
+    depends_on:
+      softether-vpn:
+        condition: service_started
+
+  i2p-yggdrasil:
+    image: nessnetwork/i2p-yggdrasil
+    container_name: i2p-yggdrasil
+    network_mode: "service:softether-vpn"
+    volumes:
+      - i2p-data:/var/lib/i2p
+    restart: unless-stopped
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_ADMIN
+      - SYS_MODULE
+    security_opt:
+      - no-new-privileges:true
+    profiles: [overlay, full]
+    depends_on:
+      softether-vpn:
+        condition: service_started
+      yggdrasil:
+        condition: service_started
+
+  skywire:
+    image: nessnetwork/skywire
+    container_name: skywire
+    network_mode: "service:softether-vpn"
+    volumes:
+      - skywire-data:/root/.skywire
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    depends_on:
+      softether-vpn:
+        condition: service_started
       emercoin-core:
         condition: service_healthy
+
+  ssh-gateway:
+    build:
+      context: .
+      dockerfile: ssh-gateway/Dockerfile
+    container_name: ssh-gateway
+    network_mode: "service:softether-vpn"
+    environment:
+      - EMC_RPC_USER=${EMERCOIN_RPC_USER:-emercoin}
+      - EMC_RPC_PASS=${EMERCOIN_RPC_PASS:?EMC_RPC_PASS must be set}
+      - SSH_ADMIN_PUBKEY=${SSH_ADMIN_PUBKEY:-}
+    volumes:
+      - ssh-gateway-config:/etc/ssh
+    read_only: true
+    tmpfs:
+      - /tmp:noexec,nosuid,size=16m
+      - /var/run/sshd:noexec,nosuid,size=4m
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    depends_on:
+      softether-vpn:
+        condition: service_started
+      emercoin-core:
+        condition: service_started
 
   privateness:
     image: nessnetwork/privateness
     container_name: privateness
-    ports:
-      - "${PRIVATENESS_PORT_P2P:-6006}:6006"
-      - "${PRIVATENESS_PORT_RPC:-6660}:6660"
+    network_mode: "service:softether-vpn"
     environment:
       - RPC_ADDR=http://127.0.0.1:6660
       - COIN=privateness
       - USER_MAX_DECIMALS=6
       - PRIVATENESS_GUI_DIR=/opt/privateness/gui/static
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
     depends_on:
-      - emercoin-core
-      - dns-reverse-proxy
+      softether-vpn:
+        condition: service_started
+      emercoin-core:
+        condition: service_started
+      dns-reverse-proxy:
+        condition: service_started
 
   pyuheprng-privatenesstools:
     image: nessnetwork/pyuheprng-privatenesstools
     container_name: pyuheprng-privatenesstools
-    ports:
-      - "${PYUHEPRNG_PORT:-5000}:5000"
-      - "${PRIVATENESSTOOLS_PORT:-8888}:8888"
+    network_mode: "service:softether-vpn"
     restart: unless-stopped
+    read_only: true
+    tmpfs:
+      - /tmp:noexec,nosuid,size=16m
+    security_opt:
+      - no-new-privileges:true
     depends_on:
+      softether-vpn:
+        condition: service_started
       emercoin-core:
         condition: service_healthy
       privateness:
@@ -139,22 +211,29 @@ services:
   dns-reverse-proxy:
     image: nessnetwork/dns-reverse-proxy
     container_name: dns-reverse-proxy
-    ports:
-      - "1053:${DNS_PORT_UDP:-53}/udp"
-      - "1053:${DNS_PORT_TCP:-53}/tcp"
-      - "${DNS_API_PORT:-8053}:8053"
+    network_mode: "service:softether-vpn"
     environment:
-      - EMERCOIN_HOST=emercoin-core
+      - EMERCOIN_HOST=127.0.0.1
       - EMERCOIN_PORT=${EMERCOIN_PORT_RPC:-6662}
       - EMERCOIN_COOKIE_FILE=/data/.cookie
       - DNS_NVS_KEY=ness:dns-reverse-proxy-config
     volumes:
       - emercoin-data:/data:ro
     restart: unless-stopped
+    read_only: true
+    tmpfs:
+      - /tmp:noexec,nosuid,size=8m
+    security_opt:
+      - no-new-privileges:true
     depends_on:
-      - emercoin-core
+      softether-vpn:
+        condition: service_started
+      emercoin-core:
+        condition: service_started
 
 volumes:
+  lbrtynet-conf:
+  lbrtynet-cache:
   emercoin-data:
   yggdrasil-data:
   i2p-data:
@@ -165,3 +244,6 @@ volumes:
 networks:
   ness-network:
     driver: bridge
+    driver_opts:
+      com.docker.network.bridge.enable_icc: "false"   # containers cannot reach each other directly on bridge
+      com.docker.network.bridge.enable_ip_masquerade: "true"

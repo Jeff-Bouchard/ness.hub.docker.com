@@ -362,7 +362,7 @@ SKYWIRE_PORT=8000                   # Skywire visor port
 
 # Privacy Services
 PRIVATENESS_PORT_P2P=6006           # Privateness P2P port
-PRIVATENESS_PORT_RPC=6660           # Privateness RPC port
+PRIVATENESS_PORT_RPC=6660           # Privateness JSON-RPC port
 PYUHEPRNG_PORT=5000                 # Entropy service port
 PRIVATENESSTOOLS_PORT=8888          # Tools API port
 

@@ -1,1 +1,0 @@
-FROM htcondor/submit:lts

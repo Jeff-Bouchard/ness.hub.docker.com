@@ -1,6 +1,46 @@
-[1;36m[10:23:51][0m Using runtime: podman, compose: podman-compose -f /media/rooty/KaisenLinux/@/home/rooty/ness.cx/hub.docker.com/docker-compose.yml
-[1;36m[10:23:55][0m Stopping any existing stack...
-[1;36m[10:23:57][0m Starting stack...
-[1;36m[10:24:07][0m Waiting for services to stabilize (30s)...
+[1;36m[16:07:08][0m Using runtime: podman, compose: podman-compose -f /media/rooty/KaisenLinux/@/home/rooty/ness.cx/hub.docker.com/docker-compose.yml
+[1;33m[VERBOSE][0m Port map: emercoin=16661/16662, privateness=6660, pyuheprng=5550, tools=8888, dns=1053, skywire=18000, yggdrasil=19001, i2p=17657, softether=1443, ssh=12222
+[1;36m[16:07:19][0m Stopping any existing stack...
+[1;36m[16:07:21][0m Starting stack...
+[1;33m[WARN][0m Compose output contains address-in-use conflicts; running in use-existing mode
+[1;36m[16:07:38][0m Waiting for services to stabilize (30s)...
 [1;32m[PASS][0m emercoin-core container running
-[1;31m[FAIL][0m privateness container not running
+[1;32m[PASS][0m privateness container running
+[1;32m[PASS][0m dns-reverse-proxy container running
+[1;33m[WARN][0m pyuheprng-privatenesstools container not running after address-in-use conflict; keeping existing stack state
+[1;32m[PASS][0m skywire container running
+[1;32m[PASS][0m ssh-gateway container running
+[1;32m[PASS][0m softether-vpn container running
+[1;32m[PASS][0m yggdrasil container running
+[1;33m[WARN][0m i2p-yggdrasil container not running (optional overlay)
+[1;36m[16:09:16][0m Port reachability
+[1;32m[PASS][0m Emercoin P2P port 16661 reachable
+[1;32m[PASS][0m Emercoin RPC port 16662 reachable
+[1;32m[PASS][0m Privateness RPC port 6660 reachable
+[1;33m[WARN][0m pyuheprng port 5550 not reachable
+[1;33m[WARN][0m privatenesstools port 8888 not reachable
+[1;32m[PASS][0m DNS reverse proxy port 1053 reachable
+[1;32m[PASS][0m Skywire UI port 18000 reachable
+[1;33m[WARN][0m Yggdrasil port 19001 not reachable
+[1;33m[WARN][0m I2P console port 17657 not reachable
+[1;33m[WARN][0m SoftEther VPN port 1443 not reachable
+[1;32m[PASS][0m SSH gateway port 12222 reachable
+[1;36m[16:09:16][0m DNS sanity check via dns-reverse-proxy
+[1;33m[WARN][0m dns-reverse-proxy did not answer queries
+[1;36m[16:09:31][0m Emercoin RPC quick check
+[1;32m[PASS][0m Emercoin RPC responded
+[1;36m[16:09:32][0m Yggdrasil config presence
+[1;33m[WARN][0m Yggdrasil config missing
+[1;36m[16:09:32][0m Skywire CLI status
+[1;33m[WARN][0m Skywire CLI not responding
+[1;33m[WARN][0m I2P checks skipped (container not running)
+[1;36m[16:09:34][0m Container resource snapshot
+NAME               CPU %       MEM USAGE / LIMIT
+emercoin-core      13.38%      370.6MB / 16.58GB
+ssh-gateway        0.12%       1.298MB / 16.58GB
+yggdrasil          94.37%      2.327MB / 16.58GB
+skywire            90.89%      10.02MB / 16.58GB
+softether-vpn      1.04%       15.62MB / 16.58GB
+dns-reverse-proxy  0.19%       118.8kB / 16.58GB
+privateness        10.30%      13.55MB / 16.58GB
+[1;36m[16:09:34][0m E2E completed

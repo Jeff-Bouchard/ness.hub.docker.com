@@ -119,6 +119,15 @@ If any factor fails, the node can still run whatever it wants, but higher-level 
 5.  **Identity-to-config pipeline**: an external orchestrator reads Emercoin entries, derives `wg.conf`, `xray config.json`, Skywire/Ygg config, DNS policy, and writes them into each container, which never contacts untrusted infrastructure directly.
 ## Images
 
+## Canonical Core Ports
+
+- `emercoin-core`:
+  - `6661/TCP` = P2P
+  - `6662/TCP` = JSON-RPC
+- `privateness`:
+  - `6006/TCP` = P2P
+  - `6660/TCP` = JSON-RPC
+
 ### 1\. emercoin-core
 
 Emercoin blockchain node

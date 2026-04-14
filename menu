@@ -30,6 +30,7 @@ fi
 RESEED_INTERVAL="${RESEED_INTERVAL:-}"
 PROFILE="${PROFILE:-pi3}"
 SSH_GATEWAY_PORT="${SSH_GATEWAY_PORT:-2222}"
+PYUHEPRNG_PORT="${PYUHEPRNG_PORT:-5550}"
 
 # Colors
 R=$'\033[0m'
@@ -39,8 +40,9 @@ C=$'\033[36m'
 B=$'\033[1m'
 
 # Service Tiers
+TIER0="lbrtynet softether-vpn"                                        # Layer-0: network substrate
 TIER1="emercoin-core privateness skywire pyuheprng-privatenesstools ssh-gateway"  # Always run
-TIER2="yggdrasil i2p-yggdrasil softether-vpn"                         # Secondary
+TIER2="yggdrasil i2p-yggdrasil"                                       # Secondary
 TIER3="dns-reverse-proxy"                                             # Third
 
 check_status() {
@@ -49,6 +51,88 @@ check_status() {
     else
         echo "${Y}○${R}"
     fi
+}
+
+check_status_simple() {
+    local name="$1"
+    local status
+    status=$($RUNTIME ps --filter "name=^${name}$" --format '{{.Status}}' 2>/dev/null | head -1)
+    [ -z "$status" ] && status=$($RUNTIME ps -a --filter "name=^${name}$" --format '{{.Status}}' 2>/dev/null | head -1)
+
+    if echo "$status" | grep -qi "up"; then
+        echo "up"
+    elif echo "$status" | grep -qi "created"; then
+        echo "created"
+    elif [ -n "$status" ]; then
+        echo "stopped"
+    else
+        echo "missing"
+    fi
+}
+
+is_port_in_use() {
+    local port="$1"
+    if command -v ss >/dev/null 2>&1; then
+        ss -tuln 2>/dev/null | grep -q ":${port} "
+    elif command -v netstat >/dev/null 2>&1; then
+        netstat -tuln 2>/dev/null | grep -q ":${port} "
+    else
+        (echo > /dev/tcp/127.0.0.1/$port) 2>/dev/null
+    fi
+}
+
+get_container_using_port() {
+    local port="$1"
+    $RUNTIME ps --format "{{.Names}}" --filter "publish=${port}" 2>/dev/null | head -1
+}
+
+smart_start() {
+    local svc="$1"
+    local port="${2:-}"
+
+    local status
+    status=$(check_status_simple "$svc")
+    if [ "$status" = "up" ]; then
+        echo "      ${G}✓${R} $svc already running"
+        return 0
+    fi
+
+    if [ -n "$port" ] && is_port_in_use "$port"; then
+        local existing
+        existing=$(get_container_using_port "$port")
+        if [ -n "$existing" ] && [ "$existing" != "$svc" ]; then
+            echo "      ${Y}⚠${R} Port $port already in use by $existing, using existing"
+            return 0
+        elif [ -z "$existing" ]; then
+            echo "      ${Y}⚠${R} Port $port already in use by an existing listener, keeping existing"
+            return 0
+        fi
+    fi
+
+    echo "      → Starting $svc..."
+    local output
+    output=$($ENGINE up -d --no-deps "$svc" 2>&1)
+    local rc=$?
+    if [ $rc -eq 0 ]; then
+        echo "      ${G}✓${R} $svc started"
+        return 0
+    fi
+
+    if echo "$output" | grep -qi "address already in use"; then
+        local existing
+        existing=""
+        [ -n "$port" ] && existing=$(get_container_using_port "$port")
+        if [ -n "$existing" ]; then
+            echo "      ${Y}⚠${R} address already in use on $port by $existing, using existing"
+        else
+            echo "      ${Y}⚠${R} address already in use, keeping existing listener"
+        fi
+        return 0
+    fi
+
+    echo "$output" | tail -8
+    echo "      ${Y}✗${R} $svc failed to start"
+    return 1
 }
 
 ensure_key_dir() {
@@ -147,6 +231,11 @@ show_menu() {
     echo "${B}${C}╚══════════════════════════════════════╝${R}"
     echo
     
+    echo "  ${B}Tier 0 (Network substrate):${R}"
+    for svc in $TIER0; do
+        printf "  %s %-25s\n" "$(check_status $svc)" "$svc"
+    done
+    echo
     echo "  ${B}Tier 1 (Always):${R}"
     for svc in $TIER1; do
         printf "  %s %-25s\n" "$(check_status $svc)" "$svc"
@@ -154,7 +243,7 @@ show_menu() {
     echo
     
     if [ "$PROFILE" = "full" ]; then
-        echo "${B}Tier 2:${R}"
+        echo "${B}Tier 2 (optional overlay routes):${R}"
         for svc in $TIER2; do
             printf "  %s %-25s\n" "$(check_status $svc)" "$svc"
         done
@@ -177,7 +266,7 @@ show_menu() {
 }
 
 cleanup() {
-    for svc in emercoin-core privateness skywire dns-reverse-proxy pyuheprng-privatenesstools ssh-gateway yggdrasil i2p-yggdrasil softether-vpn; do
+    for svc in lbrtynet softether-vpn emercoin-core privateness skywire dns-reverse-proxy pyuheprng-privatenesstools ssh-gateway yggdrasil i2p-yggdrasil; do
         $RUNTIME stop $svc &>/dev/null || true
         $RUNTIME rm -f $svc &>/dev/null || true
     done
@@ -189,8 +278,9 @@ container_menu() {
         clear
         echo "${B}${C}=== Individual Container Control ===${R}"
         echo
+        
         local i=1
-        for svc in $TIER1 $TIER2 $TIER3; do
+        for svc in $TIER0 $TIER1 $TIER2 $TIER3; do
             local status="$($RUNTIME ps --filter "name=$svc" --format '{{.Status}}' 2>/dev/null | head -1)"
             [ -z "$status" ] && status="stopped"
             printf "  ${B}[%d]${R} %-25s %s\n" "$i" "$svc" "$status"
@@ -210,7 +300,7 @@ container_menu() {
                 [ -z "$selected" ] && continue
                 read -rp "Action for $selected [start/stop/restart/logs/cleanup]: " action
                 case "$action" in
-                    start) $RUNTIME start $selected 2>/dev/null || $ENGINE up -d $selected ;;
+                    start) smart_start "$selected" ;;
                     stop) $RUNTIME stop $selected 2>/dev/null && $RUNTIME rm -f $selected ;;
                     restart) $RUNTIME restart $selected 2>/dev/null || { $RUNTIME stop $selected; $RUNTIME start $selected; } ;;
                     logs) $RUNTIME logs -f --tail=50 $selected ;;
@@ -223,47 +313,48 @@ container_menu() {
 }
 
 do_start() {
-    echo "${C}Starting NESS stack (Tier 1 first)...${R}"
+    echo "${C}Starting NESS stack (Tier 0 first)...${R}"
 
     generate_ssh_admin_env
     
     # Ensure persistent volumes exist
     $RUNTIME volume create emercoin-data 2>/dev/null || true
     $RUNTIME volume create skywire-data 2>/dev/null || true
+    $RUNTIME volume create lbrtynet-conf 2>/dev/null || true
+    $RUNTIME volume create lbrtynet-cache 2>/dev/null || true
+    
+    # Tier 0: Network substrate — must come up before anything else
+    echo "  → Tier 0: LBRTYnet + VPN tunnel..."
+    smart_start lbrtynet
+    smart_start softether-vpn "${SOFTETHER_VPN_PORT:-443}"
+    sleep 2
     
     # Tier 1: Core services always first
     echo "  → Tier 1: Core services..."
-    for svc in emercoin-core; do
-        echo "    Starting $svc..."
-        $RUNTIME run -d --replace --name emercoin-core -p 6661:6661 -p 6662:6662 \
-            -v emercoin-data:/data nessnetwork/emercoin-core:latest &>/dev/null || \
-            $ENGINE up -d emercoin-core 2>/dev/null || true
-    done
+    smart_start emercoin-core "6661"
     sleep 3
     
-    # Start remaining Tier 1
-    local tier1_rest="privateness skywire pyuheprng-privatenesstools ssh-gateway"
+    # Start remaining Tier 1 with port-aware smart_start
+    # Service:Port mappings for conflict detection
     if [ -n "$RESEED_INTERVAL" ]; then
         echo "    Starting pyuheprng-privatenesstools with ${RESEED_INTERVAL}s reseeding..."
-        $RUNTIME run -d --replace --name pyuheprng-privatenesstools \
-            -p 5000:5000 -p 8888:8888 \
-            -e RESEED_INTERVAL="$RESEED_INTERVAL" \
-            nessnetwork/pyuheprng-privatenesstools:latest 2>/dev/null || \
-            $ENGINE up -d pyuheprng-privatenesstools 2>/dev/null || true
-        tier1_rest="privateness skywire"
+        RESEED_INTERVAL="$RESEED_INTERVAL" smart_start pyuheprng-privatenesstools "${PYUHEPRNG_PORT}"
+    else
+        smart_start pyuheprng-privatenesstools "${PYUHEPRNG_PORT}"
     fi
     
-    for svc in $tier1_rest; do
-        echo "    Starting $svc..."
-        $ENGINE up -d $svc 2>/dev/null || true
-    done
+    smart_start privateness "6660"
+    smart_start skywire "8000"
+    smart_start ssh-gateway "${SSH_GATEWAY_PORT}"
     
-    # Tier 2 & 3 only for full profile
+    # Tier 2 & 3 only for full profile (overlay routes are optional)
     if [ "$PROFILE" = "full" ]; then
-        echo "  → Tier 2: Yggdrasil, I2P, SoftEther..."
-        $ENGINE up -d yggdrasil i2p-yggdrasil softether-vpn 2>/dev/null || true
+        echo "  → Tier 2: Overlay routes (Yggdrasil IPv6 + I2P garlic)..."
+        COMPOSE_PROFILES=overlay $ENGINE up -d --no-deps yggdrasil 2>&1 | grep -v "^#" || true
+        sleep 2
+        COMPOSE_PROFILES=overlay $ENGINE up -d --no-deps i2p-yggdrasil 2>&1 | grep -v "^#" || true
         echo "  → Tier 3: DNS..."
-        $ENGINE up -d dns-reverse-proxy 2>/dev/null || true
+        smart_start dns-reverse-proxy "8053"
     fi
     
     echo "${G}✓ Started${R}"
@@ -294,7 +385,7 @@ do_logs() {
 
 do_health() {
     echo "${C}Health Check:${R}"
-    for port in 6661 6662 6660 5000 8888 8053 8000 ${SSH_GATEWAY_PORT} ${SOFTETHER_VPN_PORT:-443}; do
+    for port in ${SOFTETHER_VPN_PORT:-443} 6661 6662 6660 ${PYUHEPRNG_PORT} 8888 8053 8000 ${SSH_GATEWAY_PORT}; do
         if nc -z 127.0.0.1 $port 2>/dev/null; then
             printf "  ${G}✓${R} Port %s: open\n" "$port"
         else
@@ -318,9 +409,9 @@ do_cleanup() {
 
 do_profile() {
     echo "  ${B}Profiles:${R}"
-    echo "    pi3      - Tier 1 only (lightweight)"
-    echo "    skyminer - Tier 1 without Skywire"
-    echo "    full     - All tiers (heavyweight)"
+    echo "    pi3      - Tier 0+1 only (lightweight)"
+    echo "    skyminer - Tier 0+1 without Skywire"
+    echo "    full     - All tiers + overlay routes (Yggdrasil/I2P)"
     echo
     read -rp "Select [pi3/skyminer/full]: " p
     case "$p" in pi3|skyminer|full) PROFILE="$p"; echo "Set to: $PROFILE" ;; *) echo "Invalid" ;; esac

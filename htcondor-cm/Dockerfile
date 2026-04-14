@@ -1,1 +1,0 @@
-FROM htcondor/cm:lts

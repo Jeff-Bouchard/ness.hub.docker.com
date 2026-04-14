@@ -173,10 +173,10 @@ docker run --rm -v emercoin-data:/data -v $(pwd):/backup \
 | Service | Port | Protocol | Purpose |
 |---------|------|----------|---------|
 | emercoin-core | 6661 | TCP | P2P blockchain |
-| emercoin-core | 6662 | TCP | RPC API |
+| emercoin-core | 6662 | TCP | JSON-RPC API |
 | yggdrasil | 9001 | UDP | Mesh network |
 | privateness | 6006 | TCP | P2P |
-| privateness | 6660 | TCP | RPC |
+| privateness | 6660 | TCP | JSON-RPC |
 
 ### NESS Essential Stack (adds)
 | Service | Port | Protocol | Purpose |

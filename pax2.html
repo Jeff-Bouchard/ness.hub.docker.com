@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NESS Entropy Engine v2</title>
+<style>
+body {
+  background:#0b1220;
+  color:#9ad;
+  font-family:monospace;
+  padding:20px;
+}
+input { margin:5px; }
+canvas {
+  background:#020817;
+  border-radius:10px;
+  display:block;
+  margin-top:12px;
+}
+.panel {
+  margin-top: 12px;
+  padding: 12px;
+  border: 1px solid rgba(154, 173, 221, 0.25);
+  border-radius: 10px;
+  background: rgba(255,255,255,0.03);
+}
+.small {
+  color: #7fa0c8;
+  font-size: 0.95em;
+}
+</style>
+</head>
+<body>
+
+<h2>NESS Entropy Engine (UHEPRNG) <span class="small">v2 · April 2026</span></h2>
+
+<div class="panel">
+  Seed: <input id="seed" value="ness-elite-001">
+  <button onclick="init()">Run</button>
+  <br><br>
+  ε min <input id="emin" value="0.09">
+  ε max <input id="emax" value="0.6">
+  λ <input id="lambda" value="2">
+  α <input id="alpha" value="0.35">
+  ω <input id="omega" value="0.2">
+</div>
+
+<canvas id="graph" width="800" height="200"></canvas>
+
+<div class="panel" id="stats">Run the engine to see live values.</div>
+<p id="words"></p>
+<h3 id="coherence"></h3>
+
+<script>
+// ===== UHEPRNG =====
+function uheprng(){return(function(){var o=48,c=1,p=o,s=new Array(o),i,j,k=0;var mash=Mash();for(i=0;i<o;i++)s[i]=mash(Math.random());
+function rawprng(){if(++p>=o)p=0;var t=1768863*s[p]+c*2.3283064365386963e-10;return s[p]=t-(c=t|0);}
+var random=function(range){return Math.floor(range*(rawprng()+(rawprng()*0x200000|0)*1.1102230246251565e-16));};
+random.string=function(count){var i,s='';for(i=0;i<count;i++)s+=String.fromCharCode(33+random(94));return s;};
+function hash(){var args=Array.prototype.slice.call(arguments);for(i=0;i<args.length;i++){for(j=0;j<o;j++){s[j]-=mash(args[i]);if(s[j]<0)s[j]+=1;}}}
+random.hashString=function(inStr){inStr=inStr.trim();mash(inStr);for(i=0;i<inStr.length;i++){k=inStr.charCodeAt(i);for(j=0;j<o;j++){s[j]-=mash(k);if(s[j]<0)s[j]+=1;}}};
+random.initState=function(){mash();for(i=0;i<o;i++)s[i]=mash(' ');c=1;p=o;};
+random.addEntropy=function(){var args=[];for(i=0;i<arguments.length;i++)args.push(arguments[i]);hash((k++)+(new Date().getTime())+args.join('')+Math.random());};
+return random;}());}
+function Mash(){var n=0xefc8249d;var mash=function(data){if(data){data=data.toString();for(var i=0;i<data.length;i++){n+=data.charCodeAt(i);var h=0.02519603282416938*n;n=h>>>0;h-=n;h*=n;n=h>>>0;h-=n;n+=h*0x100000000;}return(n>>>0)*2.3283064365386963e-10;}else n=0xefc8249d;};return mash;}
+
+// ===== ENGINE =====
+let rng;
+let data = [];
+let t = 0;
+let lastVal = 0;
+let lastBase = 0;
+let lastEpsilon = 0;
+
+const wordsList = ["identity","proof","consensus","entropy","coherence","node","network"];
+
+function init(){
+  rng = uheprng();
+  rng.initState();
+  rng.hashString(document.getElementById("seed").value);
+
+  data = [];
+  t = 0;
+  lastVal = 0;
+  lastBase = 0;
+  lastEpsilon = 0;
+  loop();
+}
+
+function step(){
+  const emin = parseFloat(eminEl.value);
+  const emax = parseFloat(emaxEl.value);
+  const lambda = parseFloat(lambdaEl.value);
+  const alpha = parseFloat(alphaEl.value);
+  const omega = parseFloat(omegaEl.value);
+
+  // base entropy from PRNG
+  let base = rng(1e9) / 1e9;
+
+  // bounded entropy
+  let epsilon = emin + (emax - emin) * base;
+
+  // decay (coherence pressure)
+  epsilon *= Math.exp(-lambda * 0.01);
+
+  // pulse injection
+  if (Math.sin(t * omega) > 0.95){
+    rng.addEntropy("pulse", t);
+    epsilon += alpha * (rng(1e6) / 1e6);
+  }
+
+  lastBase = base;
+  lastEpsilon = epsilon;
+  t += 0.1;
+  return epsilon;
+}
+
+// ===== COHERENCE =====
+function computeCoherence(arr){
+  if (!arr.length) return 0;
+  let mean = arr.reduce((a,b)=>a+b,0) / arr.length;
+  let variance = arr.reduce((a,b)=>a+(b-mean)**2,0) / arr.length;
+  return 1 - variance;
+}
+
+// ===== WORD STREAM =====
+function generateWords(){
+  let out = [];
+  for(let i=0;i<20;i++){
+    out.push(wordsList[rng(wordsList.length)]);
+  }
+  return out.join(" ");
+}
+
+// ===== GRAPH =====
+const canvas = document.getElementById("graph");
+const ctx = canvas.getContext("2d");
+
+function draw(){
+  ctx.clearRect(0,0,800,200);
+  ctx.beginPath();
+  for(let i=0;i<data.length;i++){
+    let x = i * (800 / Math.max(data.length, 1));
+    let y = 200 - data[i] * 200;
+    if(i===0) ctx.moveTo(x,y);
+    else ctx.lineTo(x,y);
+  }
+  ctx.strokeStyle = "#00d4ff";
+  ctx.lineWidth = 2;
+  ctx.stroke();
+}
+
+function updateStats(){
+  const coh = data.length > 20 ? computeCoherence(data).toFixed(3) : "n/a";
+  document.getElementById("stats").innerHTML =
+    `<strong>Numbers</strong><br>` +
+    `t = ${t.toFixed(2)}<br>` +
+    `base = ${lastBase.toFixed(6)}<br>` +
+    `epsilon = ${lastEpsilon.toFixed(6)}<br>` +
+    `samples = ${data.length}<br>` +
+    `coherence = ${coh}`;
+  if (data.length > 20) {
+    document.getElementById("coherence").innerText = "Coherence: " + coh;
+  }
+}
+
+// ===== LOOP =====
+function loop(){
+  let val = step();
+  lastVal = val;
+  data.push(val);
+  if(data.length > 200) data.shift();
+
+  draw();
+  document.getElementById("words").innerText = generateWords();
+  updateStats();
+
+  requestAnimationFrame(loop);
+}
+
+// inputs
+const eminEl = document.getElementById("emin");
+const emaxEl = document.getElementById("emax");
+const lambdaEl = document.getElementById("lambda");
+const alphaEl = document.getElementById("alpha");
+const omegaEl = document.getElementById("omega");
+</script>
+</body>
+</html>

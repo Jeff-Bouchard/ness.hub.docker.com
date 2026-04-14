@@ -1,0 +1,633 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>NESS Command Deck</title>
+  <style>
+    :root {
+      --bg-0: #06080f;
+      --bg-1: #0e1424;
+      --bg-2: #1b2740;
+      --panel: #0f1729;
+      --panel-soft: #16213b;
+      --border: #243455;
+      --text: #e8eeff;
+      --muted: #9aabd3;
+      --ok: #48db91;
+      --warn: #ffd166;
+      --err: #ff7b7b;
+      --accent: #57b4ff;
+      --accent-2: #33e0d0;
+      --shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
+      --radius: 18px;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: "Space Grotesk", "IBM Plex Sans", "Segoe UI", sans-serif;
+      color: var(--text);
+      background:
+        radial-gradient(circle at 12% -10%, #2a3d66 0%, transparent 35%),
+        radial-gradient(circle at 90% 8%, #1a5b6d 0%, transparent 30%),
+        linear-gradient(165deg, var(--bg-0), var(--bg-1) 38%, #0a1020 100%);
+    }
+
+    .shell {
+      width: calc(100vw - 24px);
+      max-width: 1520px;
+      margin: 0 auto;
+      padding: 18px 10px 24px;
+      display: grid;
+      gap: 16px;
+      opacity: 0;
+      transform: translateY(8px);
+      animation: fadeIn 0.45s ease forwards;
+    }
+
+    .panel {
+      background: linear-gradient(160deg, rgba(26, 38, 66, 0.92), rgba(12, 19, 35, 0.92));
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(4px);
+    }
+
+    .hero {
+      padding: 20px;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr);
+      gap: 12px;
+    }
+
+    .kicker {
+      font-size: 0.78rem;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--accent-2);
+      margin: 0;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: clamp(1.3rem, 2.2vw, 2rem);
+      font-weight: 700;
+      letter-spacing: 0.02em;
+    }
+
+    .subtitle {
+      margin: 0;
+      color: var(--muted);
+      font-size: 0.95rem;
+      max-width: 72ch;
+    }
+
+    .status-row {
+      display: grid;
+      gap: 8px;
+      grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+    }
+
+    .chip {
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      padding: 8px 12px;
+      font-size: 0.83rem;
+      color: var(--muted);
+      background: rgba(13, 23, 43, 0.8);
+    }
+
+    .chip strong {
+      color: var(--text);
+      font-weight: 600;
+    }
+
+    .layout {
+      display: grid;
+      gap: 16px;
+      grid-template-columns: minmax(0, 1fr);
+      align-items: start;
+    }
+
+    .ops-stack {
+      display: grid;
+      gap: 16px;
+    }
+
+    .card {
+      padding: 16px;
+    }
+
+    .card h2 {
+      margin: 0 0 4px;
+      font-size: 0.98rem;
+      letter-spacing: 0.03em;
+      text-transform: uppercase;
+      color: #c8d8ff;
+    }
+
+    .card p {
+      margin: 0 0 12px;
+      color: var(--muted);
+      font-size: 0.86rem;
+    }
+
+    .actions {
+      display: grid;
+      gap: 10px;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .btn {
+      border: 1px solid var(--border);
+      border-radius: 13px;
+      padding: 11px 12px;
+      min-height: 52px;
+      background: linear-gradient(175deg, #15223b, #10192e);
+      color: var(--text);
+      font-size: 0.9rem;
+      text-align: left;
+      cursor: pointer;
+      transition: transform 0.16s ease, border-color 0.16s ease, background 0.2s ease;
+    }
+
+    .btn:hover:enabled {
+      transform: translateY(-1px);
+      border-color: #3e5f9c;
+      background: linear-gradient(175deg, #1b2d50, #12203a);
+    }
+
+    .btn:disabled {
+      opacity: 0.55;
+      cursor: wait;
+    }
+
+    .btn.primary {
+      border-color: #2b5eaf;
+      background: linear-gradient(175deg, #184282, #12325f);
+    }
+
+    .btn.warning {
+      border-color: #7a5d1b;
+      background: linear-gradient(175deg, #473616, #34280f);
+    }
+
+    .btn.danger {
+      border-color: #7f2e35;
+      background: linear-gradient(175deg, #501b21, #3a1317);
+    }
+
+    .meta {
+      display: grid;
+      gap: 8px;
+      margin-top: 10px;
+    }
+
+    .meta-row {
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 7px 10px;
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+      font-size: 0.82rem;
+      color: var(--muted);
+      background: rgba(12, 19, 35, 0.75);
+    }
+
+    .meta-row b {
+      color: #dce8ff;
+      font-weight: 600;
+    }
+
+    .console {
+      overflow: hidden;
+      display: grid;
+      grid-template-rows: auto auto minmax(260px, 1fr);
+    }
+
+    .console-panel {
+      position: sticky;
+      top: 14px;
+      max-height: calc(100vh - 28px);
+      border: 0;
+      box-shadow: none;
+    }
+
+    .console-toolbar {
+      padding: 12px 14px;
+      border-bottom: 0;
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      background: rgba(15, 25, 45, 0.95);
+    }
+
+    .toolbar-group {
+      display: inline-flex;
+      gap: 6px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+
+    .mini-btn {
+      border: 1px solid var(--border);
+      border-radius: 9px;
+      background: #14223c;
+      color: var(--muted);
+      padding: 6px 8px;
+      font-size: 0.77rem;
+      cursor: pointer;
+    }
+
+    .mini-btn.active {
+      color: var(--text);
+      border-color: #4978ca;
+      background: #1b3769;
+    }
+
+    .mini-btn:hover {
+      color: var(--text);
+    }
+
+    .stream-status {
+      padding: 8px 14px;
+      border-bottom: 0;
+      font-size: 0.8rem;
+      color: var(--muted);
+      background: rgba(11, 17, 31, 0.85);
+    }
+
+    .log {
+      margin: 0;
+      padding: 14px;
+      background: #0a1223;
+      font-family: "JetBrains Mono", "IBM Plex Mono", "Consolas", monospace;
+      font-size: 0.79rem;
+      line-height: 1.42;
+      overflow: auto;
+    }
+
+    .line {
+      display: block;
+      margin-bottom: 2px;
+      color: #d9e6ff;
+    }
+
+    .line.info { color: #d5e2ff; }
+    .line.ok { color: var(--ok); }
+    .line.warn { color: var(--warn); }
+    .line.err { color: var(--err); }
+
+    .tips ul {
+      margin: 0;
+      padding-left: 18px;
+      color: var(--muted);
+      font-size: 0.84rem;
+      line-height: 1.45;
+    }
+
+    .tips li + li {
+      margin-top: 6px;
+    }
+
+    .pulse {
+      position: relative;
+    }
+
+    .pulse::after {
+      content: "";
+      position: absolute;
+      inset: -2px;
+      border-radius: 14px;
+      border: 1px solid transparent;
+      animation: pulse 1.05s ease;
+    }
+
+    @media (min-width: 1020px) {
+      .layout {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .action-grid {
+        display: grid;
+        gap: 16px;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .action-grid .card:first-child {
+        grid-column: span 2;
+      }
+
+      .console {
+        grid-template-rows: auto auto minmax(380px, 1fr);
+      }
+    }
+
+    @keyframes fadeIn {
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    @keyframes pulse {
+      from { border-color: rgba(92, 181, 255, 0.75); }
+      to { border-color: rgba(92, 181, 255, 0); }
+    }
+  </style>
+</head>
+<body>
+  <main class="shell">
+    <section class="panel hero">
+      <p class="kicker">Operations Console</p>
+      <h1>NESS Command Deck</h1>
+      <p class="subtitle">Focused control surface for stack operations. Actions stream output in real time and track command state for safer operations.</p>
+      <div class="status-row">
+        <div class="chip" id="apiChip"><strong>API</strong> checking...</div>
+        <div class="chip"><strong>Emercoin</strong> 6661 P2P / 6662 RPC</div>
+        <div class="chip"><strong>Privateness</strong> 6006 P2P / 6660 RPC</div>
+        <div class="chip" id="busyChip"><strong>Execution</strong> idle</div>
+      </div>
+    </section>
+
+    <section class="layout">
+      <div class="ops-stack">
+        <div class="action-grid">
+          <article class="panel card">
+            <h2>Primary Controls</h2>
+            <p>High-frequency controls for daily operations.</p>
+            <div class="actions">
+              <button class="btn primary" data-action="start">Start Stack</button>
+              <button class="btn" data-action="restart">Restart Stack</button>
+              <button class="btn" data-action="status">Refresh Status</button>
+              <button class="btn" data-action="health">Health Check</button>
+            </div>
+          </article>
+
+          <article class="panel card">
+            <h2>Diagnostics</h2>
+            <p>Gather operational details before interventions.</p>
+            <div class="actions">
+              <button class="btn" data-action="logs">Logs Snapshot</button>
+              <button class="btn" id="btnApiPing">Ping API</button>
+            </div>
+          </article>
+
+          <article class="panel card">
+            <h2>Maintenance & Risk</h2>
+            <p>Potentially disruptive actions include extra confirmation.</p>
+            <div class="actions">
+              <button class="btn warning" data-action="pull">Update Images</button>
+              <button class="btn danger" data-action="stop" data-confirm="Stop all services now?">Stop Stack</button>
+              <button class="btn danger" data-action="cleanup" data-confirm="Run cleanup? This may remove stopped resources.">Cleanup</button>
+            </div>
+          </article>
+        </div>
+
+        <aside class="panel card tips">
+          <h2>Runbook Notes</h2>
+          <p>Quick guardrails for safe operation.</p>
+          <ul>
+            <li>Use <strong>Refresh Status</strong> before and after any change.</li>
+            <li>If output reports <code>address already in use</code>, this stack keeps existing listeners by design.</li>
+            <li>Use <strong>Update Images</strong> during low-traffic windows.</li>
+            <li>Current endpoint mode is <strong>POST-only</strong> for API actions.</li>
+          </ul>
+          <div class="meta">
+            <div class="meta-row"><span>Last action</span><b id="lastAction">none</b></div>
+            <div class="meta-row"><span>Last exit code</span><b id="lastCode">n/a</b></div>
+            <div class="meta-row"><span>Last run time</span><b id="lastDuration">n/a</b></div>
+          </div>
+        </aside>
+      </div>
+
+      <section class="panel console console-panel">
+        <div class="console-toolbar">
+          <div class="toolbar-group" id="filterGroup">
+            <button class="mini-btn active" data-filter="all">All</button>
+            <button class="mini-btn" data-filter="ok">Success</button>
+            <button class="mini-btn" data-filter="warn">Warnings</button>
+            <button class="mini-btn" data-filter="err">Errors</button>
+          </div>
+          <div class="toolbar-group">
+            <button class="mini-btn" id="toggleAutoscroll">Autoscroll: on</button>
+            <button class="mini-btn" id="copyLog">Copy</button>
+            <button class="mini-btn" id="downloadLog">Download</button>
+            <button class="mini-btn" id="clearLog">Clear</button>
+          </div>
+        </div>
+        <div class="stream-status" id="streamStatus">Console ready</div>
+        <pre class="log" id="log"></pre>
+      </section>
+    </section>
+  </main>
+
+  <script>
+    const API = window.location.origin && window.location.origin !== "null"
+      ? window.location.origin
+      : "http://127.0.0.1:8091";
+
+    const state = {
+      busy: false,
+      filter: "all",
+      autoscroll: true,
+      entries: []
+    };
+
+    const el = {
+      log: document.getElementById("log"),
+      apiChip: document.getElementById("apiChip"),
+      busyChip: document.getElementById("busyChip"),
+      streamStatus: document.getElementById("streamStatus"),
+      lastAction: document.getElementById("lastAction"),
+      lastCode: document.getElementById("lastCode"),
+      lastDuration: document.getElementById("lastDuration"),
+      actionButtons: Array.from(document.querySelectorAll("button[data-action]")),
+      filterButtons: Array.from(document.querySelectorAll("#filterGroup .mini-btn"))
+    };
+
+    function stamp() {
+      return new Date().toLocaleTimeString();
+    }
+
+    function kindFromText(text) {
+      const line = text.toLowerCase();
+      if (line.includes("failed") || line.includes("error") || line.includes("exception")) return "err";
+      if (line.includes("already in use") || line.includes("keeping existing") || line.includes("using existing")) return "warn";
+      if (line.includes("started") || line.includes("running") || line.includes("ok") || line.includes("done") || line.includes("✓")) return "ok";
+      return "info";
+    }
+
+    function setBusy(value) {
+      state.busy = value;
+      el.actionButtons.forEach((btn) => {
+        btn.disabled = value;
+        btn.classList.toggle("pulse", value && btn.dataset.action === "status");
+      });
+      el.busyChip.innerHTML = value ? "<strong>Execution</strong> running" : "<strong>Execution</strong> idle";
+      el.busyChip.style.color = value ? "#ffd166" : "#9aabd3";
+    }
+
+    function pushLog(message, kind = "info") {
+      state.entries.push({ time: stamp(), kind, message: String(message) });
+      renderLog();
+    }
+
+    function renderLog() {
+      const frag = document.createDocumentFragment();
+      el.log.textContent = "";
+
+      state.entries
+        .filter((entry) => state.filter === "all" || entry.kind === state.filter)
+        .forEach((entry) => {
+          const span = document.createElement("span");
+          span.className = `line ${entry.kind}`;
+          span.textContent = `[${entry.time}] ${entry.message}`;
+          frag.appendChild(span);
+        });
+
+      el.log.appendChild(frag);
+      if (state.autoscroll) {
+        el.log.scrollTop = el.log.scrollHeight;
+      }
+    }
+
+    function updateMeta(action, code, durationMs) {
+      el.lastAction.textContent = action || "none";
+      el.lastCode.textContent = code;
+      el.lastDuration.textContent = typeof durationMs === "number" ? `${durationMs} ms` : "n/a";
+    }
+
+    async function checkApi() {
+      try {
+        const r = await fetch(`${API}/api/health`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ probe: "ui" })
+        });
+        if (!r.ok) throw new Error("API probe failed");
+        el.apiChip.innerHTML = "<strong>API</strong> online";
+        el.apiChip.style.color = "#48db91";
+      } catch (err) {
+        el.apiChip.innerHTML = "<strong>API</strong> offline";
+        el.apiChip.style.color = "#ff7b7b";
+        pushLog(`API probe failed: ${err.message}`, "err");
+      }
+    }
+
+    async function runAction(action) {
+      if (state.busy) return;
+      const start = performance.now();
+      setBusy(true);
+      el.streamStatus.textContent = `Running action: ${action}`;
+      pushLog(`Action queued: ${action}`);
+
+      try {
+        const response = await fetch(`${API}/api/menu`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action })
+        });
+
+        const payload = await response.json();
+
+        if (payload.stderr && payload.stderr.trim()) {
+          payload.stderr.split("\n").filter(Boolean).forEach((line) => pushLog(line, kindFromText(line)));
+        }
+        if (payload.stdout && payload.stdout.trim()) {
+          payload.stdout.split("\n").filter(Boolean).forEach((line) => pushLog(line, kindFromText(line)));
+        }
+
+        const duration = Math.round(performance.now() - start);
+        if (response.ok) {
+          pushLog(`Action completed: ${action}`, "ok");
+          el.streamStatus.textContent = `Completed: ${action}`;
+        } else {
+          pushLog(`Action failed: ${payload.error || payload.exit_code || "unknown error"}`, "err");
+          el.streamStatus.textContent = `Failed: ${action}`;
+        }
+
+        updateMeta(action, payload.exit_code ?? (response.ok ? 0 : "error"), duration);
+      } catch (err) {
+        pushLog(`Request error: ${err.message}`, "err");
+        el.streamStatus.textContent = `Request error while running: ${action}`;
+        updateMeta(action, "network", Math.round(performance.now() - start));
+      } finally {
+        setBusy(false);
+      }
+    }
+
+    function bindEvents() {
+      el.actionButtons.forEach((btn) => {
+        btn.addEventListener("click", () => {
+          const prompt = btn.dataset.confirm;
+          if (prompt && !window.confirm(prompt)) {
+            pushLog("Sensitive action canceled by operator", "warn");
+            return;
+          }
+          runAction(btn.dataset.action);
+        });
+      });
+
+      document.getElementById("btnApiPing").addEventListener("click", checkApi);
+
+      document.getElementById("toggleAutoscroll").addEventListener("click", (event) => {
+        state.autoscroll = !state.autoscroll;
+        event.currentTarget.textContent = `Autoscroll: ${state.autoscroll ? "on" : "off"}`;
+      });
+
+      document.getElementById("clearLog").addEventListener("click", () => {
+        state.entries = [];
+        renderLog();
+      });
+
+      document.getElementById("copyLog").addEventListener("click", async () => {
+        const text = state.entries.map((e) => `[${e.time}] ${e.message}`).join("\n");
+        try {
+          await navigator.clipboard.writeText(text);
+          pushLog("Console copied to clipboard", "ok");
+        } catch (_) {
+          pushLog("Clipboard write blocked by browser", "warn");
+        }
+      });
+
+      document.getElementById("downloadLog").addEventListener("click", () => {
+        const text = state.entries.map((e) => `[${e.time}] ${e.message}`).join("\n");
+        const blob = new Blob([text], { type: "text/plain;charset=utf-8" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `ness-command-deck-${Date.now()}.log`;
+        a.click();
+        URL.revokeObjectURL(url);
+      });
+
+      el.filterButtons.forEach((btn) => {
+        btn.addEventListener("click", () => {
+          state.filter = btn.dataset.filter;
+          el.filterButtons.forEach((b) => b.classList.remove("active"));
+          btn.classList.add("active");
+          renderLog();
+        });
+      });
+    }
+
+    async function boot() {
+      bindEvents();
+      pushLog("Command deck initialized");
+      await checkApi();
+      await runAction("status");
+    }
+
+    boot();
+  </script>
+</body>
+</html>

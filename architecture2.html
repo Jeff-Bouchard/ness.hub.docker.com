@@ -1,0 +1,856 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>NESS Hub — Full Privacy Architecture</title>
+<style>
+  :root {
+    --bg:       #0d1117;
+    --bg2:      #161b22;
+    --bg3:      #21262d;
+    --border:   #30363d;
+    --green:    #3fb950;
+    --green2:   #26a641;
+    --yellow:   #d29922;
+    --red:      #f85149;
+    --blue:     #58a6ff;
+    --purple:   #bc8cff;
+    --cyan:     #39d353;
+    --orange:   #e3b341;
+    --gray:     #8b949e;
+    --text:     #e6edf3;
+    --text2:    #c9d1d9;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    font-size: 14px;
+    line-height: 1.5;
+    padding: 32px 24px;
+  }
+  h1 {
+    font-size: 22px;
+    font-weight: 600;
+    color: var(--blue);
+    margin-bottom: 4px;
+  }
+  .subtitle {
+    color: var(--gray);
+    font-size: 13px;
+    margin-bottom: 32px;
+  }
+
+  /* ── Legend ── */
+  .legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px;
+    margin-bottom: 32px;
+    padding: 14px 18px;
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+  }
+  .leg { display: flex; align-items: center; gap: 7px; font-size: 12px; color: var(--text2); }
+  .dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+
+  /* ── Section labels ── */
+  .section-label {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    color: var(--gray);
+    margin: 28px 0 10px;
+  }
+
+  /* ── Flow arrow between tiers ── */
+  .flow-arrow {
+    text-align: center;
+    color: var(--gray);
+    font-size: 22px;
+    margin: 6px 0;
+  }
+
+  /* ── Tier wrapper ── */
+  .tier {
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: var(--bg2);
+    padding: 16px 18px;
+    margin-bottom: 8px;
+  }
+  .tier-title {
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+    margin-bottom: 14px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .tier-title .badge {
+    font-size: 10px;
+    padding: 2px 7px;
+    border-radius: 20px;
+    font-weight: 600;
+  }
+
+  /* ── Card grid ── */
+  .card-grid {
+    display: grid;
+    gap: 12px;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  }
+  .card {
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 14px 16px;
+  }
+  .card-title {
+    font-size: 13px;
+    font-weight: 600;
+    margin-bottom: 10px;
+    display: flex;
+    align-items: center;
+    gap: 7px;
+  }
+  .card ul {
+    list-style: none;
+    padding: 0;
+  }
+  .card ul li {
+    font-size: 12px;
+    color: var(--text2);
+    padding: 2px 0;
+    display: flex;
+    align-items: flex-start;
+    gap: 6px;
+  }
+  .card ul li .ico { flex-shrink: 0; margin-top: 1px; }
+  .ok   { color: var(--green); }
+  .warn { color: var(--yellow); }
+  .bad  { color: var(--red); }
+  .info { color: var(--blue); }
+  .priv { color: var(--purple); }
+
+  /* ── Port pills ── */
+  .ports {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+    margin-top: 8px;
+  }
+  .port {
+    font-size: 11px;
+    font-family: monospace;
+    padding: 2px 8px;
+    border-radius: 4px;
+    border: 1px solid;
+  }
+  .port.pub  { color: var(--yellow); border-color: var(--yellow); background: rgba(210,153,34,.08); }
+  .port.priv { color: var(--blue);   border-color: var(--blue);   background: rgba(88,166,255,.08); }
+  .port.enc  { color: var(--green);  border-color: var(--green);  background: rgba(63,185,80,.08); }
+
+  /* ── Identity bedrock ── */
+  .bedrock {
+    border: 2px solid var(--purple);
+    border-radius: 10px;
+    background: rgba(188,140,255,.06);
+    padding: 18px 20px;
+    margin-bottom: 12px;
+  }
+  .bedrock-title {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--purple);
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .nvs-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 10px;
+  }
+  .nvs-card {
+    background: var(--bg3);
+    border: 1px solid rgba(188,140,255,.3);
+    border-radius: 6px;
+    padding: 10px 12px;
+    font-size: 12px;
+  }
+  .nvs-card .nk { font-family: monospace; color: var(--purple); font-weight: 600; }
+  .nvs-card .nv { color: var(--text2); margin-top: 3px; }
+  .nvs-card .ni { color: var(--gray); font-size: 11px; margin-top: 4px; }
+
+  /* ── Hop matrix ── */
+  .hop-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+    margin-top: 8px;
+  }
+  .hop-table th {
+    text-align: left;
+    padding: 7px 10px;
+    background: var(--bg3);
+    color: var(--gray);
+    font-weight: 600;
+    border-bottom: 1px solid var(--border);
+    font-size: 11px;
+    letter-spacing: .04em;
+    text-transform: uppercase;
+  }
+  .hop-table td {
+    padding: 7px 10px;
+    border-bottom: 1px solid var(--border);
+    color: var(--text2);
+    vertical-align: top;
+  }
+  .hop-table tr:last-child td { border-bottom: none; }
+  .hop-table tr:hover td { background: rgba(255,255,255,.02); }
+
+  /* ── Privacy path diagram ── */
+  .path-box {
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px 18px;
+    font-family: monospace;
+    font-size: 12px;
+    color: var(--text2);
+    white-space: pre;
+    overflow-x: auto;
+    line-height: 1.7;
+  }
+
+  /* ── Gap table ── */
+  .gap-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+  }
+  .gap-table th {
+    text-align: left;
+    padding: 7px 10px;
+    background: var(--bg3);
+    color: var(--gray);
+    font-weight: 600;
+    border-bottom: 1px solid var(--border);
+    font-size: 11px;
+    letter-spacing: .04em;
+    text-transform: uppercase;
+  }
+  .gap-table td {
+    padding: 7px 10px;
+    border-bottom: 1px solid var(--border);
+    color: var(--text2);
+    vertical-align: top;
+  }
+  .gap-table tr:last-child td { border-bottom: none; }
+
+  /* ── Internet exposure bar ── */
+  .exposure {
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px 18px;
+  }
+  .exp-row {
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+    padding: 5px 0;
+    border-bottom: 1px solid var(--border);
+    font-size: 12px;
+  }
+  .exp-row:last-child { border-bottom: none; }
+  .exp-port { font-family: monospace; color: var(--orange); min-width: 120px; }
+  .exp-why  { color: var(--text2); flex: 1; }
+  .exp-enc  { color: var(--green); min-width: 90px; text-align: right; }
+
+  hr.divider {
+    border: none;
+    border-top: 1px solid var(--border);
+    margin: 32px 0;
+  }
+</style>
+</head>
+<body>
+
+<h1>⬡ NESS Hub — Full Privacy Architecture</h1>
+<div class="subtitle">LBRTYnet Community Node · Docker Compose · Fact-checked from source · April 2026</div>
+
+<!-- Legend -->
+<div class="legend">
+  <div class="leg"><div class="dot" style="background:var(--green)"></div> E2E encrypted — destination key only</div>
+  <div class="leg"><div class="dot" style="background:var(--yellow)"></div> Encrypted in transit, terminates at server</div>
+  <div class="leg"><div class="dot" style="background:var(--red)"></div> Plaintext / no encryption</div>
+  <div class="leg"><div class="dot" style="background:var(--purple)"></div> Identity bedrock (Emercoin NVS)</div>
+  <div class="leg"><div class="dot" style="background:var(--blue)"></div> Loopback / internal only</div>
+  <div class="leg"><div class="dot" style="background:var(--orange)"></div> Public internet port</div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════ -->
+<!-- IDENTITY BEDROCK -->
+<!-- ══════════════════════════════════════════════════════════ -->
+<div class="section-label">🔐 Identity Bedrock</div>
+<div class="bedrock">
+  <div class="bedrock-title">
+    ⛓ Emercoin NVS — Write-Once, Read-Many Blockchain PKI
+    <span style="font-size:11px;font-weight:400;color:var(--gray)">One EMC keypair controls all records · PoW immutability · revoke by re-signing</span>
+  </div>
+  <div class="nvs-grid">
+    <div class="nvs-card">
+      <div class="nk">ssh:&lt;username&gt;</div>
+      <div class="nv">Ed25519 / RSA public key(s)</div>
+      <div class="ni">✅ Public — meant to be known<br>Read by <code>emcssh</code> at login time<br>Fallback: emerapi.info → explorer.emercoin.com</div>
+    </div>
+    <div class="nvs-card">
+      <div class="nk">ssl:&lt;serial&gt;</div>
+      <div class="nv">sha256=&lt;X.509 cert fingerprint&gt;</div>
+      <div class="ni">✅ Public — fingerprint only<br>Browser/TLS mutual auth via EMCSSL<br>cert UID embeds info: decrypt key</div>
+    </div>
+    <div class="nvs-card">
+      <div class="nk">info:&lt;index&gt;</div>
+      <div class="nv">AES-256-CBC(gzip(vCard))</div>
+      <div class="ni">✅ Public blob — opaque ciphertext<br>Decrypt key lives in X.509 cert UID only<br>Only authenticated cert holder can read</div>
+    </div>
+    <div class="nvs-card">
+      <div class="nk">dns:&lt;hostname&gt;</div>
+      <div class="nv">A / AAAA / CNAME / TXT</div>
+      <div class="ni">✅ Clearnet addresses only<br>❌ Overlay addrs (ygg/i2p/onion) MUST NOT<br>go here — blockchain is public forever</div>
+    </div>
+  </div>
+  <div style="margin-top:12px;font-size:12px;color:var(--gray);padding:8px 12px;background:rgba(188,140,255,.05);border-radius:6px;border-left:3px solid var(--purple)">
+    <strong style="color:var(--purple)">Why this is the bedrock:</strong>
+    The same EMC wallet signs <em>all four</em> namespaces.
+    SSH key auth, TLS cert auth, vCard identity and clearnet DNS are all anchored to one unforgeable on-chain identity.
+    Overlay network addresses (Yggdrasil, Skywire, I2P, Tor) are <strong>never published to the blockchain</strong> —
+    they are exchanged privately inside an already-authenticated session (SSH or EMCSSL), or stored encrypted in the <code>info:</code> vCard
+    accessible only to EMCSSL-authenticated peers.
+  </div>
+</div>
+
+<div class="flow-arrow">↓ authenticated identity flows down into every service</div>
+
+<!-- ══════════════════════════════════════════════════════════ -->
+<!-- TIER 0 -->
+<!-- ══════════════════════════════════════════════════════════ -->
+<div class="section-label">Tier 0 — Network Substrate</div>
+<div class="tier">
+  <div class="tier-title">
+    <span style="color:var(--orange)">⬡</span> LBRTYnet + SoftEther VPN
+    <span class="badge" style="background:rgba(210,153,34,.15);color:var(--orange)">Always on</span>
+    <span class="badge" style="background:rgba(248,81,73,.12);color:var(--red)">NET_ADMIN</span>
+  </div>
+  <div class="card-grid">
+
+    <div class="card">
+      <div class="card-title"><span style="color:var(--orange)">◈</span> lbrtynet (weave kernel)</div>
+      <ul>
+        <li><span class="ico ok">✓</span> nanomsg BUS — inter-blade IPC only, <strong>loopback 127.0.0.1:5555</strong></li>
+        <li><span class="ico warn">⚠</span> Peer discovery :42424/udp — UDP broadcast, <strong>plaintext, unsigned</strong></li>
+        <li><span class="ico ok">✓</span> STUN discovery → external NAT address resolved</li>
+        <li><span class="ico ok">✓</span> UDP hole punching (punch.c) — direct peer channels</li>
+        <li><span class="ico bad">✗</span> Punched UDP channels carry no encryption yet (known gap)</li>
+        <li><span class="ico ok">✓</span> Ed25519 identity (identity.c) — keypair per node, seed from MAC+time+hostname+urandom</li>
+        <li><span class="ico bad">✗</span> peerd does not sign ANNOUNCE messages yet (identity.c API exists, not wired)</li>
+        <li><span class="ico ok">✓</span> Routing: iproute2 Phase 1 → OSPF Phase 2 → BGP+OVS Phase 3 (auto-detected)</li>
+        <li><span class="ico ok">✓</span> Blade plugin system — .so loaded at runtime, OS callbacks sandboxed</li>
+        <li><span class="ico ok">✓</span> Attack watchdog — segmentation on detection (weave_main.c)</li>
+      </ul>
+      <div class="ports">
+        <span class="port pub">:42424/udp peerd</span>
+        <span class="port priv">:5555 BUS (loopback)</span>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title"><span style="color:var(--green)">⬡</span> softether-vpn</div>
+      <ul>
+        <li><span class="ico ok">✓</span> WireGuard transport — ChaCha20-Poly1305, perfect forward secrecy</li>
+        <li><span class="ico ok">✓</span> All child services share this network namespace (loopback)</li>
+        <li><span class="ico ok">✓</span> Admin RPC locked to 127.0.0.1:5556 only</li>
+        <li><span class="ico ok">✓</span> Hard-fail if SOFTETHER_ADMIN_PASSWORD unset</li>
+        <li><span class="ico ok">✓</span> tun device · NET_ADMIN + SYS_MODULE only</li>
+        <li><span class="ico warn">⚠</span> WireGuard E2E terminates at VPN server — not true E2E to final dest</li>
+      </ul>
+      <div class="ports">
+        <span class="port pub">:443/udp WireGuard</span>
+        <span class="port priv">:5556 admin (loopback)</span>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<div class="flow-arrow">↓ service_healthy → Tier 1 starts</div>
+
+<!-- ══════════════════════════════════════════════════════════ -->
+<!-- TIER 1 -->
+<!-- ══════════════════════════════════════════════════════════ -->
+<div class="section-label">Tier 1 — Core Services</div>
+<div class="tier">
+  <div class="tier-title">
+    <span style="color:var(--blue)">◉</span> Always on — all network_mode: service:softether-vpn
+    <span class="badge" style="background:rgba(88,166,255,.12);color:var(--blue)">All loopback inter-service</span>
+  </div>
+  <div class="card-grid">
+
+    <div class="card">
+      <div class="card-title"><span style="color:var(--purple)">⛓</span> emercoin-core</div>
+      <ul>
+        <li><span class="ico ok">✓</span> Blockchain P2P sync — public protocol</li>
+        <li><span class="ico ok">✓</span> JSON-RPC locked to 127.0.0.1:6662</li>
+        <li><span class="ico ok">✓</span> NVS: authoritative SSH keys, SSL certs, vCards, DNS</li>
+        <li><span class="ico ok">✓</span> no-new-privileges · cap_drop:ALL</li>
+      </ul>
+      <div class="ports">
+        <span class="port pub">:6661 P2P</span>
+        <span class="port priv">:6662 RPC (loopback)</span>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title"><span style="color:var(--green)">🔑</span> ssh-gateway + emcssh</div>
+      <ul>
+        <li><span class="ico ok">✓</span> AuthorizedKeysCommand: emcssh resolves keys from NVS</span></li>
+        <li><span class="ico ok">✓</span> Fallback chain: RPC → emerapi.info GraphQL → explorer.emercoin.com</li>
+        <li><span class="ico ok">✓</span> Ed25519 host key only — RSA/DSA/ECDSA deleted on start</li>
+        <li><span class="ico ok">✓</span> KexAlgorithms: curve25519 only</li>
+        <li><span class="ico ok">✓</span> Ciphers: ChaCha20-Poly1305 + AES-GCM only</li>
+        <li><span class="ico ok">✓</span> MACs: ETM SHA-512/256 only</li>
+        <li><span class="ico ok">✓</span> AllowTcpForwarding NO — no pivot into internal namespace</li>
+        <li><span class="ico ok">✓</span> MaxAuthTries 3 · LoginGraceTime 20s · MaxStartups 5:50:10</li>
+        <li><span class="ico ok">✓</span> PasswordAuthentication NO — pubkey only</li>
+        <li><span class="ico ok">✓</span> read_only FS · tmpfs /tmp noexec · no-new-privileges</li>
+      </ul>
+      <div class="ports">
+        <span class="port pub">:2222 SSH</span>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title"><span style="color:var(--blue)">◎</span> dns-reverse-proxy</div>
+      <ul>
+        <li><span class="ico ok">✓</span> Resolves EmerDNS NVS records for local clients</li>
+        <li><span class="ico ok">✓</span> API locked to 127.0.0.1:8053</li>
+        <li><span class="ico ok">✓</span> read_only FS · no-new-privileges</li>
+      </ul>
+      <div class="ports">
+        <span class="port pub">:1053 DNS</span>
+        <span class="port priv">:8053 API (loopback)</span>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title"><span style="color:var(--cyan)">◈</span> privateness (NESS / Skycoin fork)</div>
+      <ul>
+        <li><span class="ico ok">✓</span> P2P internal only — RPC locked to 127.0.0.1:6660</li>
+        <li><span class="ico ok">✓</span> no-new-privileges · cap_drop:ALL</li>
+      </ul>
+      <div class="ports">
+        <span class="port priv">:6660 RPC (loopback)</span>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title"><span style="color:var(--cyan)">◈</span> skywire (NESS visor)</div>
+      <ul>
+        <li><span class="ico ok">✓</span> dmsg transport: Ed25519 + Noise_XK protocol — true E2E</li>
+        <li><span class="ico ok">✓</span> Routing address IS the pubkey — no IP needed</li>
+        <li><span class="ico ok">✓</span> Keypair generated on first run (skywire-cli config gen)</li>
+        <li><span class="ico warn">⚠</span> Bootstraps to Skycoin public dmsg servers by default</li>
+        <li><span class="ico ok">✓</span> no-new-privileges</li>
+      </ul>
+      <div class="ports">
+        <span class="port pub">:8000 visor UI</span>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title"><span style="color:var(--blue)">⚙</span> pyuheprng + privatenesstools</div>
+      <ul>
+        <li><span class="ico ok">✓</span> Entropy service — internal only</li>
+        <li><span class="ico ok">✓</span> Tools API — internal only</li>
+        <li><span class="ico ok">✓</span> read_only FS · tmpfs /tmp noexec · no-new-privileges</li>
+      </ul>
+      <div class="ports">
+        <span class="port priv">:5550 entropy (loopback)</span>
+        <span class="port priv">:8888 tools (loopback)</span>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<div class="flow-arrow">↓ optional — profile: overlay | full</div>
+
+<!-- ══════════════════════════════════════════════════════════ -->
+<!-- TIER 2 -->
+<!-- ══════════════════════════════════════════════════════════ -->
+<div class="section-label">Tier 2 — Overlay Networks (optional)</div>
+<div class="tier">
+  <div class="tier-title">
+    <span style="color:var(--green)">⬡</span> True E2E overlays — no IP address exposure
+    <span class="badge" style="background:rgba(63,185,80,.12);color:var(--green)">E2E confirmed from source</span>
+  </div>
+  <div class="card-grid">
+
+    <div class="card">
+      <div class="card-title"><span style="color:var(--green)">⬡</span> Yggdrasil</div>
+      <ul>
+        <li><span class="ico ok">✓</span> Ed25519 keypair per node — generated on first run</li>
+        <li><span class="ico ok">✓</span> IPv6 address = SHA512(pubkey) truncated — unforgeable</li>
+        <li><span class="ico ok">✓</span> All traffic encrypted to destination pubkey (X25519 + XSalsa20-Poly1305)</li>
+        <li><span class="ico ok">✓</span> Intermediate nodes forward ciphertext they cannot read</li>
+        <li><span class="ico ok">✓</span> Peers arrive via lbrtynet mesh / WireGuard — not raw internet</li>
+        <li><span class="ico warn">⚠</span> Needs ≥1 bootstrap peer URL in yggdrasil.conf or node is isolated</li>
+        <li><span class="ico ok">✓</span> NET_ADMIN only · no-new-privileges</li>
+      </ul>
+      <div class="ports">
+        <span class="port priv">:9001 (loopback)</span>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title"><span style="color:var(--green)">⬡</span> I2P (i2pd — garlic routing)</div>
+      <ul>
+        <li><span class="ico ok">✓</span> Garlic routing: messages bundled + layered encryption</li>
+        <li><span class="ico ok">✓</span> 6 routers minimum between sender and .i2p destination</li>
+        <li><span class="ico ok">✓</span> Destination = b32 (SHA256 of dest key) — no IP involved</li>
+        <li><span class="ico ok">✓</span> HTTP proxy / SOCKS / SAM all locked to 127.0.0.1</li>
+        <li><span class="ico ok">✓</span> Exposes lbrtynet-comm (5557) + lbrtynet-httpd (8080) as .i2p services</li>
+        <li><span class="ico ok">✓</span> Watchdog: auto-disables if not confirmed stable within window</li>
+        <li><span class="ico warn">⚠</span> SOCKS outproxy to clearnet breaks E2E — outproxy can read traffic</li>
+      </ul>
+      <div class="ports">
+        <span class="port priv">:7657 console (loopback)</span>
+        <span class="port priv">:4444 HTTP proxy (loopback)</span>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title"><span style="color:var(--yellow)">⬡</span> Tor (lbrtynet tor.c)</div>
+      <ul>
+        <li><span class="ico ok">✓</span> torrc auto-generated by lbrtynet tor.c</li>
+        <li><span class="ico ok">✓</span> SOCKS5 locked to 127.0.0.1 + RFC-1918 only</li>
+        <li><span class="ico ok">✓</span> Hidden service (.onion) for node config UI</li>
+        <li><span class="ico ok">✓</span> ExitRelay 0 · ClientOnly 1 — no relay burden</li>
+        <li><span class="ico ok">✓</span> Watchdog: auto-disables if not confirmed stable</li>
+        <li><span class="ico warn">⚠</span> .onion destinations: E2E preserved ✓</li>
+        <li><span class="ico bad">✗</span> Clearnet destinations via Tor: E2E NOT preserved — exit node reads traffic</li>
+      </ul>
+      <div class="ports">
+        <span class="port priv">SOCKS5 (loopback only)</span>
+        <span class="port enc">.onion HS</span>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<hr class="divider"/>
+
+<!-- ══════════════════════════════════════════════════════════ -->
+<!-- E2E HOP MATRIX -->
+<!-- ══════════════════════════════════════════════════════════ -->
+<div class="section-label">E2E Encryption — Full Hop Matrix</div>
+<div style="background:var(--bg2);border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:8px;">
+<table class="hop-table">
+  <thead>
+    <tr>
+      <th>Transport</th>
+      <th>Algorithm</th>
+      <th>Key holder</th>
+      <th>E2E?</th>
+      <th>What is hidden from intermediaries</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><strong>Yggdrasil</strong></td>
+      <td>X25519 + XSalsa20-Poly1305</td>
+      <td>Destination node keypair</td>
+      <td><span class="ok">✓ TRUE E2E</span></td>
+      <td>Full payload · origin IP from relay hops</td>
+    </tr>
+    <tr>
+      <td><strong>Skywire (dmsg)</strong></td>
+      <td>Ed25519 + Noise_XK</td>
+      <td>Destination visor keypair</td>
+      <td><span class="ok">✓ TRUE E2E</span></td>
+      <td>Full payload · origin IP from dmsg relays</td>
+    </tr>
+    <tr>
+      <td><strong>I2P → .i2p eepsite</strong></td>
+      <td>ElGamal + AES streaming</td>
+      <td>Destination leaseset key</td>
+      <td><span class="ok">✓ TRUE E2E</span></td>
+      <td>Full payload · both origin and destination IPs</td>
+    </tr>
+    <tr>
+      <td><strong>Tor → .onion</strong></td>
+      <td>AES-128-CTR × 3 layers</td>
+      <td>Ephemeral circuit keys</td>
+      <td><span class="ok">✓ TRUE E2E</span></td>
+      <td>Full payload · origin IP from all relays</td>
+    </tr>
+    <tr>
+      <td><strong>WireGuard (SoftEther)</strong></td>
+      <td>ChaCha20-Poly1305 + PFS</td>
+      <td>VPN server keypair</td>
+      <td><span class="warn">⚠ PARTIAL</span></td>
+      <td>Traffic from internet · terminates at VPN server</td>
+    </tr>
+    <tr>
+      <td><strong>SSH (ssh-gateway)</strong></td>
+      <td>curve25519 + ChaCha20/AES-GCM</td>
+      <td>Server Ed25519 host key</td>
+      <td><span class="warn">⚠ PARTIAL</span></td>
+      <td>Session content · terminates at SSH server</td>
+    </tr>
+    <tr>
+      <td><strong>I2P → clearnet outproxy</strong></td>
+      <td>Garlic to exit only</td>
+      <td>Outproxy operator</td>
+      <td><span class="bad">✗ BROKEN</span></td>
+      <td>Origin IP only · outproxy reads payload</td>
+    </tr>
+    <tr>
+      <td><strong>Tor → clearnet exit</strong></td>
+      <td>Onion to exit only</td>
+      <td>Exit node operator</td>
+      <td><span class="bad">✗ BROKEN</span></td>
+      <td>Origin IP only · exit reads payload</td>
+    </tr>
+    <tr>
+      <td><strong>LBRTYnet BUS</strong></td>
+      <td>None (TCP loopback)</td>
+      <td>—</td>
+      <td><span class="warn">N/A — IPC</span></td>
+      <td>Loopback only, never leaves the host</td>
+    </tr>
+    <tr>
+      <td><strong>peerd discovery</strong></td>
+      <td>None (UDP plaintext)</td>
+      <td>—</td>
+      <td><span class="bad">✗ NONE</span></td>
+      <td>Nothing — manifest URL visible on LAN</td>
+    </tr>
+  </tbody>
+</table>
+</div>
+
+<hr class="divider"/>
+
+<!-- ══════════════════════════════════════════════════════════ -->
+<!-- NESTED HOP PATHS -->
+<!-- ══════════════════════════════════════════════════════════ -->
+<div class="section-label">How Multi-Hop Preserves E2E (Nested Encryption)</div>
+<div class="path-box"><span class="ok">Scenario A — Yggdrasil over WireGuard (recommended path)</span>
+
+Client
+  │  X25519 encrypt to dest Yggdrasil pubkey        ← <span class="ok">E2E layer — only dest can read</span>
+  ▼
+Yggdrasil packet  (ciphertext — intermediate nodes blind)
+  │  wrapped in WireGuard ChaCha20-Poly1305          ← <span class="warn">transport layer — VPN server can see Ygg packet but NOT its payload</span>
+  ▼
+softether-vpn → lbrtynet peer mesh
+  │  WireGuard terminates at peer's VPN server
+  ▼
+Peer's Yggdrasil router → hops to destination Ygg node
+  │  destination holds the Ed25519 private key
+  ▼
+DECRYPTS  ✓  <span class="ok">E2E intact — WireGuard saw only ciphertext</span>
+
+
+<span class="ok">Scenario B — Skywire over Yggdrasil over WireGuard (double E2E)</span>
+
+Client
+  │  Noise_XK to dest Skywire pubkey                ← <span class="ok">E2E layer 1 — Skywire</span>
+  ▼
+Skywire packet
+  │  X25519 to dest Yggdrasil addr                  ← <span class="ok">E2E layer 2 — Yggdrasil</span>
+  ▼
+Yggdrasil packet
+  │  ChaCha20-Poly1305 WireGuard                    ← <span class="warn">transport — sees Ygg ciphertext only</span>
+  ▼
+WireGuard → Yggdrasil → Skywire → destination node
+  DECRYPTS both layers in reverse  ✓  <span class="ok">both E2E intact, nested</span>
+
+
+<span class="bad">Scenario C — Tor → clearnet  (E2E BROKEN — for reference)</span>
+
+Client
+  │  AES-CTR × 3 onion layers                       ← hides your IP address
+  ▼
+Guard relay → Middle relay → Exit relay
+                                 │
+                           Exit DECRYPTS outer layer
+                           sends plaintext HTTP to clearnet server  <span class="bad">← exit reads traffic</span>
+  Use HTTPS to clearnet if you must use Tor this way.
+
+
+<span class="ok">Scenario D — I2P service tunnel (lbrtynet-comm / lbrtynet-httpd)</span>
+
+Remote I2P peer
+  │  ElGamal + AES garlic cloves to leaseset key    ← <span class="ok">E2E — only your node has the leaseset private key</span>
+  ▼
+6+ I2P routers (blind forwarding)
+  ▼
+i2pd on this node → local service on 127.0.0.1:5557 or :8080
+  DECRYPTS  ✓  <span class="ok">E2E intact</span>  — no IP of sender is known to the local service</div>
+
+<hr class="divider"/>
+
+<!-- ══════════════════════════════════════════════════════════ -->
+<!-- HOW IDENTITY CONNECTS EVERYTHING -->
+<!-- ══════════════════════════════════════════════════════════ -->
+<div class="section-label">How One Identity Authenticates Across All Networks</div>
+<div class="path-box"><span style="color:var(--purple)">ONE EMC KEYPAIR (secp256k1 wallet)</span>
+        │
+        │  signs NVS records on blockchain
+        ▼
+<span style="color:var(--purple)">┌─────────────────────── EMERCOIN NVS (public blockchain) ─────────────────────────┐</span>
+<span style="color:var(--purple)">│  ssh:alice  → Ed25519 pubkey          ← SSH login auth (emcssh)                  │</span>
+<span style="color:var(--purple)">│  ssl:alice  → SHA256(X.509 cert)      ← EMCSSL mutual TLS auth                   │</span>
+<span style="color:var(--purple)">│  info:alice → AES-encrypted vCard     ← private data, key only in X.509 cert UID │</span>
+<span style="color:var(--purple)">│  dns:alice  → A / AAAA (clearnet)     ← DNS resolution (clearnet addresses only) │</span>
+<span style="color:var(--purple)">└──────────┬──────────────────┬─────────────────────────────────────────────────────┘</span>
+           │                  │
+           ▼                  ▼
+    SSH session            EMCSSL TLS session
+    (E2E encrypted)        (mutual cert auth)
+           │                  │
+           └────────┬─────────┘
+                    │  <span style="color:var(--gray)">inside this authenticated session, exchange privately:</span>
+                    ▼
+         <span style="color:var(--green)">Overlay addresses (NEVER on blockchain):</span>
+           Yggdrasil IPv6:  200:xxxx:...        → share directly
+           Skywire pubkey:  &lt;hex64&gt;             → share directly
+           I2P b32:         &lt;hash&gt;.b32.i2p      → share directly
+           Tor v3 onion:    &lt;hash&gt;.onion         → share directly
+                    │
+                    ▼
+         <span style="color:var(--green)">Future contacts use overlay addresses directly</span>
+         — no blockchain lookup needed
+         — overlay addresses can rotate freely without touching NVS
+         — correlation between EMC identity and overlay addr stays private</div>
+
+<hr class="divider"/>
+
+<!-- ══════════════════════════════════════════════════════════ -->
+<!-- KNOWN GAPS -->
+<!-- ══════════════════════════════════════════════════════════ -->
+<div class="section-label">Known Gaps (confirmed from source — not speculation)</div>
+<div style="background:var(--bg2);border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:8px;">
+<table class="gap-table">
+  <thead>
+    <tr>
+      <th>#</th>
+      <th>Component</th>
+      <th>Gap</th>
+      <th>Fix (existing primitives)</th>
+      <th>Risk if unpatched</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>1</td>
+      <td><code>peerd.c</code></td>
+      <td>ANNOUNCE / PEER responses are unsigned UDP plaintext</td>
+      <td><code>lbrty_identity_sign()</code> exists in identity.c — not wired to peerd</td>
+      <td><span class="bad">LAN attacker serves malicious manifest URL</span></td>
+    </tr>
+    <tr>
+      <td>2</td>
+      <td><code>peerd.c</code></td>
+      <td>Punched UDP channels carry no encryption</td>
+      <td>Noise/ChaCha20 session on the punched <code>udp_sock</code> using node Ed25519 key</td>
+      <td><span class="warn">Direct peer traffic readable on path</span></td>
+    </tr>
+    <tr>
+      <td>3</td>
+      <td><code>yggdrasil.conf</code></td>
+      <td>No bootstrap peers seeded — node isolated on first run</td>
+      <td>Manifest system injects <code>Peers: ["tls://..."]</code> on install</td>
+      <td><span class="warn">Yggdrasil overlay non-functional until manual config</span></td>
+    </tr>
+    <tr>
+      <td>4</td>
+      <td><code>peerd.c</code></td>
+      <td>Node ID is MAC address, not Ed25519 fingerprint</td>
+      <td>Use <code>lbrty_identity_init()</code> fingerprint as node ID</td>
+      <td><span class="warn">Node identity not cryptographically bound</span></td>
+    </tr>
+    <tr>
+      <td>5</td>
+      <td><code>skywire</code></td>
+      <td>Bootstraps to Skycoin public dmsg servers</td>
+      <td>Edit <code>skywire-config.json</code> to use self-hosted dmsg server</td>
+      <td><span class="warn">Bootstrap metadata visible to Skycoin infrastructure</span></td>
+    </tr>
+  </tbody>
+</table>
+</div>
+
+<hr class="divider"/>
+
+<!-- ══════════════════════════════════════════════════════════ -->
+<!-- INTERNET EXPOSURE SUMMARY -->
+<!-- ══════════════════════════════════════════════════════════ -->
+<div class="section-label">Internet Exposure Summary</div>
+<div class="exposure">
+  <div class="exp-row">
+    <span class="exp-port">:443/udp</span>
+    <span class="exp-why">WireGuard ingress — mesh entry point, intentionally public</span>
+    <span class="exp-enc ok">✓ ChaCha20</span>
+  </div>
+  <div class="exp-row">
+    <span class="exp-port">:42424/udp</span>
+    <span class="exp-why">LBRTYnet peerd — mesh bootstrap, UDP broadcast</span>
+    <span class="exp-enc bad">✗ Plaintext</span>
+  </div>
+  <div class="exp-row">
+    <span class="exp-port">:6661</span>
+    <span class="exp-why">Emercoin P2P — blockchain sync, standard P2P protocol</span>
+    <span class="exp-enc warn">~ P2P protocol</span>
+  </div>
+  <div class="exp-row">
+    <span class="exp-port">:2222</span>
+    <span class="exp-why">SSH gateway — pubkey+NVS only, Ed25519, brute-force throttled</span>
+    <span class="exp-enc ok">✓ curve25519</span>
+  </div>
+  <div class="exp-row">
+    <span class="exp-port">:8000</span>
+    <span class="exp-why">Skywire visor UI — recommend restricting to VPN clients only</span>
+    <span class="exp-enc warn">⚠ UI exposed</span>
+  </div>
+  <div class="exp-row">
+    <span class="exp-port">:1053</span>
+    <span class="exp-why">EmerDNS resolver for local clients</span>
+    <span class="exp-enc warn">~ DNS (plaintext)</span>
+  </div>
+  <div class="exp-row" style="background:rgba(63,185,80,.04)">
+    <span class="exp-port" style="color:var(--green)">all others</span>
+    <span class="exp-why" style="color:var(--green)">Bound to 127.0.0.1 — not reachable from internet</span>
+    <span class="exp-enc ok">✓ Blocked</span>
+  </div>
+</div>
+
+<div style="margin-top:32px;font-size:11px;color:var(--gray);text-align:center;">
+  All claims verified against source code in <code>lbrtynet/src/</code>, <code>emcssh/source/</code>, <code>emcssl/</code>,
+  <code>i2p-yggdrasil/</code>, <code>skywire/</code>, <code>ssh-gateway/</code> · April 2026
+</div>
+
+</body>
+</html>

@@ -11,12 +11,13 @@ SSH_GATEWAY_PORT="${SSH_GATEWAY_PORT:-2222}"
 EMERCOIN_P2P_PORT="${EMERCOIN_PORT_P2P:-6661}"
 EMERCOIN_RPC_PORT="${EMERCOIN_PORT_RPC:-6662}"
 PRIVATENESS_RPC_PORT="${PRIVATENESS_PORT_RPC:-6660}"
-PYUHEPRNG_PORT="${PYUHEPRNG_PORT:-5000}"
+PYUHEPRNG_PORT="${PYUHEPRNG_PORT:-5550}"
 PRIVATENESSTOOLS_PORT="${PRIVATENESSTOOLS_PORT:-8888}"
 SKYWIRE_PORT="${SKYWIRE_PORT:-8000}"
 YGGDRASIL_PORT="${YGGDRASIL_PORT:-9001}"
 I2P_CONSOLE_PORT="${I2P_CONSOLE_PORT:-7657}"
 COMPOSE_CMD=()
+VERBOSE="${VERBOSE:-1}"
 
 cyan="\033[1;36m"
 green="\033[1;32m"
@@ -28,6 +29,7 @@ log() { echo -e "${cyan}[$(date '+%H:%M:%S')]${reset} $1" | tee -a "$LOG_FILE"; 
 pass() { echo -e "${green}[PASS]${reset} $1" | tee -a "$LOG_FILE"; }
 warn() { echo -e "${yellow}[WARN]${reset} $1" | tee -a "$LOG_FILE"; }
 fail() { echo -e "${red}[FAIL]${reset} $1" | tee -a "$LOG_FILE"; exit 1; }
+vlog() { [ "$VERBOSE" = "1" ] && echo -e "${yellow}[VERBOSE]${reset} $1" | tee -a "$LOG_FILE" || true; }
 
 require() {
   command -v "$1" >/dev/null 2>&1 || fail "Missing required command: $1"
@@ -62,6 +64,7 @@ main() {
   detect_runtime
 
   log "Using runtime: ${RUNTIME}, compose: ${COMPOSE_CMD[*]}"
+  vlog "Port map: emercoin=${EMERCOIN_P2P_PORT}/${EMERCOIN_RPC_PORT}, privateness=${PRIVATENESS_RPC_PORT}, pyuheprng=${PYUHEPRNG_PORT}, tools=${PRIVATENESSTOOLS_PORT}, dns=${DNS_PORT}, skywire=${SKYWIRE_PORT}, yggdrasil=${YGGDRASIL_PORT}, i2p=${I2P_CONSOLE_PORT}, softether=${SOFTETHER_PORT}, ssh=${SSH_GATEWAY_PORT}"
 
   # Best-effort cleanup of stale named containers that may conflict with compose
   local stale_names=(
@@ -76,11 +79,36 @@ main() {
   "${COMPOSE_CMD[@]}" down --remove-orphans >/dev/null 2>&1 || true
 
   log "Starting stack..."
+  local up_out
+  local address_in_use_seen=0
+  up_out="$(mktemp)"
   if [ "${COMPOSE_CMD[0]}" = "podman-compose" ]; then
-    "${COMPOSE_CMD[@]}" up -d --build
+    if ! "${COMPOSE_CMD[@]}" up -d --build 2>&1 | tee "$up_out"; then
+      if grep -Eqi 'address already in use|bind: address already in use' "$up_out"; then
+        address_in_use_seen=1
+        warn "Compose reported address already in use; keeping existing listeners and continuing"
+      else
+        fail "Compose up failed (see output above)"
+      fi
+    fi
   else
-    "${COMPOSE_CMD[@]}" up -d --build --quiet-pull
+    if ! "${COMPOSE_CMD[@]}" up -d --build --quiet-pull 2>&1 | tee "$up_out"; then
+      if grep -Eqi 'address already in use|bind: address already in use' "$up_out"; then
+        address_in_use_seen=1
+        warn "Compose reported address already in use; keeping existing listeners and continuing"
+      else
+        fail "Compose up failed (see output above)"
+      fi
+    fi
   fi
+
+  if grep -Eqi 'address already in use|bind: address already in use' "$up_out"; then
+    if [ "$address_in_use_seen" -eq 0 ]; then
+      address_in_use_seen=1
+      warn "Compose output contains address-in-use conflicts; running in use-existing mode"
+    fi
+  fi
+  rm -f "$up_out"
 
   log "Waiting for services to stabilize (30s)..."
   sleep 30
@@ -113,11 +141,43 @@ main() {
     return 1
   }
 
+  port_reachable() {
+    local port="$1"
+    if command -v nc >/dev/null 2>&1; then
+      nc -z 127.0.0.1 "$port" >/dev/null 2>&1
+    else
+      ( : < /dev/tcp/127.0.0.1/"$port" ) >/dev/null 2>&1
+    fi
+  }
+
+  expected_service_port() {
+    case "$1" in
+      emercoin-core) echo "$EMERCOIN_P2P_PORT" ;;
+      privateness) echo "$PRIVATENESS_RPC_PORT" ;;
+      dns-reverse-proxy) echo "$DNS_PORT" ;;
+      pyuheprng-privatenesstools) echo "$PYUHEPRNG_PORT" ;;
+      skywire) echo "$SKYWIRE_PORT" ;;
+      ssh-gateway) echo "$SSH_GATEWAY_PORT" ;;
+      softether-vpn) echo "$SOFTETHER_PORT" ;;
+      yggdrasil) echo "$YGGDRASIL_PORT" ;;
+      i2p-yggdrasil) echo "$I2P_CONSOLE_PORT" ;;
+      *) echo "" ;;
+    esac
+  }
+
   for svc in "${required_services[@]}"; do
     if wait_container_up "$svc" 30; then
       pass "$svc container running"
     else
-      fail "$svc container not running"
+      local fallback_port
+      fallback_port="$(expected_service_port "$svc")"
+      if [ -n "$fallback_port" ] && port_reachable "$fallback_port"; then
+        warn "$svc container not running, but port $fallback_port is already in use; using existing listener"
+      elif [ "$address_in_use_seen" -eq 1 ]; then
+        warn "$svc container not running after address-in-use conflict; keeping existing stack state"
+      else
+        fail "$svc container not running"
+      fi
     fi
   done
 
@@ -125,7 +185,13 @@ main() {
     if wait_container_up "$svc" 10; then
       pass "$svc container running"
     else
-      warn "$svc container not running (optional overlay)"
+      local fallback_port
+      fallback_port="$(expected_service_port "$svc")"
+      if [ -n "$fallback_port" ] && port_reachable "$fallback_port"; then
+        warn "$svc container not running; using existing listener on port $fallback_port"
+      else
+        warn "$svc container not running (optional overlay)"
+      fi
     fi
   done
 

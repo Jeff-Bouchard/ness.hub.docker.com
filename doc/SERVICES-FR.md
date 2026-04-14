@@ -14,7 +14,7 @@ Chaque composant est une brique d’infrastructure de sécurité, avec ports et 
 - Nommage décentralisé (NVS)
 - Source d’entropie RC4OK
 - Découverte de services
-- Ports : 6661 (P2P), 6662 (RPC)
+- Ports : 6661 (P2P), 6662 (JSON-RPC)
 - Point d’ancrage de confiance pour tout le réseau
 
 ### 2. Privateness
@@ -23,7 +23,7 @@ Chaque composant est une brique d’infrastructure de sécurité, avec ports et 
 
 - Coordination réseau
 - Gestion des services
-- Ports : 6006 (P2P), 6660 (RPC)
+- Ports : 6006 (P2P), 6660 (JSON-RPC)
 
 ### 3. DNS Reverse Proxy
 

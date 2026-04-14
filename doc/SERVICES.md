@@ -11,13 +11,13 @@ Complete list of all services in the privateness.network stack.
 - Decentralized naming (NVS)
 - RC4OK entropy source
 - Service discovery
-- Port: 6661 (P2P), 6662 (RPC)
+- Port: 6661 (P2P), 6662 (JSON-RPC)
 
 ### 2. Privateness
 **Core application**
 - Network coordination
 - Service management
-- Ports: 6006 (P2P), 6660 (RPC)
+- Ports: 6006 (P2P), 6660 (JSON-RPC)
 
 ### 3. DNS Reverse Proxy
 **Decentralized DNS**
